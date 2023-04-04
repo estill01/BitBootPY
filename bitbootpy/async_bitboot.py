@@ -23,6 +23,7 @@ class AsyncBitBoot:
 
         return ses
 
+    # TODO Fix this
     async def announce(self):
         entry = lt.create_torrent()
         entry.add_tracker("udp://tracker.openbittorrent.com:80/announce", 0)
