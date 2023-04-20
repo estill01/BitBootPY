@@ -6,15 +6,26 @@
 import hashlib
 import time
 import libtorrent as lt
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Optional
 from tenacity import retry, wait_fixed, stop_after_attempt
 import logging
+import asyncio
+import argparse
+import sys
 
 logging.basicConfig(level=logging.INFO)
 
 
 class BitBootConfig:
-    def __init__(self, bootstrap_nodes=None, rate_limit_delay=1.0, max_retries=3, retry_delay=5.0):
+    def __init__(
+        self,
+        bootstrap_nodes: Optional[List[Tuple[str, int]]] = None,
+        rate_limit_delay: float = 1.0,
+        max_retries: int = 3,
+        retry_delay: float = 5.0,
+        continuous_mode: Optional[Dict[str, bool]] = None,
+        network_names: Optional[List[str]] = None,
+    ):
         self.bootstrap_nodes = bootstrap_nodes or [
             ("router.utorrent.com", 6881),
             ("router.bittorrent.com", 6881),
@@ -24,7 +35,8 @@ class BitBootConfig:
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-
+        self.continuous_mode = continuous_mode or {}
+        self.network_names = network_names or []
 
 class DHTManager:
     def __init__(self, bootstrap_nodes: List[Tuple[str, int]] = None):
@@ -58,11 +70,21 @@ class DHTManager:
 
 
 class BitBoot:
-    def __init__(self, config=None):
+    def __init__(
+        self,
+        config: Optional[BitBootConfig] = None,
+        continuous_mode: Optional[Dict[str, bool]] = None,
+        network_names: Optional[List[str]] = None,
+    ):
         self._config = config or BitBootConfig()
         self._dht_manager = DHTManager(self._config.bootstrap_nodes)
-        self._discovered_peers = {}
-        self._continuous_mode = False
+
+        # Reconcile constructor args with BitBootConfig values
+        self._continuous_mode = continuous_mode or self._config.continuous_mode
+        self._network_names = network_names or self._config.network_names
+
+        self._discovered_peers = {name: set() for name in self._network_names}
+
 
     def __del__(self):
         self._dht_manager.stop()
@@ -77,6 +99,9 @@ class BitBoot:
     def _generate_info_hash(self, network_name: str) -> bytes:
         return hashlib.sha1(network_name.encode()).digest()
 
+    def num_peers(self) -> Dict[str, int]:
+        return {name: len(peers) for name, peers in self._discovered_peers.items()}
+
     # -----------------------
     # Lookup
     # -----------------------
@@ -90,8 +115,9 @@ class BitBoot:
 
         await asyncio.gather(*tasks)
 
+
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to lookup network"))
-    async def _lookup_single(self, network_name: str, num_searches: int, delay: int):
+    async def _lookup_single(self, network_name: str, num_searches: int, delay: int) -> None:
         info_hash = hashlib.sha1(network_name.encode()).digest()
         found_peers = set()
 
@@ -127,7 +153,8 @@ class BitBoot:
 
 
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to announce peer"))
-    async def _announce_peer_single(self, network_name: str, port: int):
+    async def _announce_peer_single(self, network_name: str, port: int) -> None:
+
         info_hash = hashlib.sha1(network_name.encode()).digest()
         self._dht_manager.session.async_add_torrent({
             "info_hash": lt.sha1_hash(info_hash),
@@ -142,69 +169,89 @@ class BitBoot:
     # -----------------------
     # Continuous Mode
     # -----------------------
-    async def start_continuous_mode(self, network_names: List[str]):
-        self._continuous_mode = True
-        while self._continuous_mode:
-            await self.lookup(network_names)
+    async def start_continuous_mode(self, network_name: str):
+        if network_name not in self._network_names:
+            raise ValueError(f"Network name '{network_name}' is not configured")
+
+        self._continuous_mode[network_name] = True
+        while self._continuous_mode[network_name]:
+            await self.lookup([network_name])
             await asyncio.sleep(self._config.rate_limit_delay)
 
-    def stop_continuous_mode(self):
-        self._continuous_mode = False
+    def stop_continuous_mode(self, network_name: str):
+        self._continuous_mode[network_name] = False
 
+    def continuous_mode_status(self) -> Dict[str, bool]:
+        return self._continuous_mode
 
+def main(argv: List[str]):
+    parser = argparse.ArgumentParser(
+        description="BitBoot: A tool for decentralized peer discovery in P2P networks"
+    )
+    parser.add_argument(
+        "-a",
+        "--announce",
+        metavar="NETWORK_NAME",
+        nargs="*",
+        help="Announce a peer in the specified network(s)",
+    )
+    parser.add_argument(
+        "-l",
+        "--lookup",
+        metavar="NETWORK_NAME",
+        nargs="*",
+        help="Lookup peers in the specified network(s)",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=6881,
+        help="Port number to announce (default: 6881)",
+    )
+    parser.add_argument(
+        "--continuous",
+        metavar="NETWORK_NAME",
+        nargs="*",
+        help="Enable continuous polling mode for the specified network(s)",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="CONFIG_PATH",
+        help="Path to a configuration file",
+    )
 
-def main():
-    parser = argparse.ArgumentParser(description="BitBoot Peer Discovery")
-    parser.add_argument("network_names", nargs="*", help="The names of the networks you want to announce or lookup")
-    parser.add_argument("-f", "--file", help="Load network names from a file")
-    parser.add_argument("-a", "--announce", action="store_true", help="Announce a peer in the specified networks")
-    parser.add_argument("-l", "--lookup", action="store_true", help="Lookup peers in the specified networks")
-    parser.add_argument("-p", "--port", type=int, help="The port to use when announcing a peer (required for -a)")
-    parser.add_argument("-c", "--continuous", action="store_true", help="Run in continuous polling mode")
+    args = parser.parse_args(argv)
 
-    args = parser.parse_args()
+    config = BitBootConfig()
 
-    if not (args.announce or args.lookup):
-        parser.error("At least one of -a/--announce or -l/--lookup is required")
+    if args.config:
+        # Load configuration from the file
+        with open(args.config, "r") as f:
+            loaded_config = json.load(f)
+        config = BitBootConfig(**loaded_config)
 
-    if args.announce and not args.port:
-        parser.error("The -p/--port option is required when announcing a peer")
+    bitboot = BitBoot(config=config)
 
-    network_names = args.network_names
-
-    if args.file:
-        network_names.extend(load_network_names_from_file(args.file))
-
-    if not network_names:
-        parser.error("No network names provided. Provide them as arguments or use -f/--file option")
-
-    bitboot = BitBoot()
-
-    if args.continuous:
-        print("Running in continuous polling mode")
-
-    while True:
+    async def run_async_tasks():
+        tasks = []
         if args.announce:
-        asyncio.run(bitboot.announce_peer(network_names, args.port))
-        print(f"Announced peer for networks {network_names} on port {args.port}")
-
+            for network_name in args.announce:
+                tasks.append(bitboot.announce(network_name, args.port))
         if args.lookup:
-        print(f"Looking up peers for networks {network_names}:")
-        asyncio.run(bitboot.lookup(network_names))
+            for network_name in args.lookup:
+                tasks.append(bitboot.lookup(network_name))
+        if args.continuous:
+            for network_name in args.continuous:
+                tasks.append(bitboot.start_continuous_mode(network_name))
 
-        if not args.continuous:
-        break
+        if tasks:
+            await asyncio.gather(*tasks)
 
-        print(f"Waiting {bitboot._config.rate_limit_delay} seconds before polling again")
-        time.sleep(bitboot._config.rate_limit_delay)
-
-
-    if args.announce:
-        asyncio.run(bitboot.announce_peer(network_names, args.port))
-        print(f"Announced peer for networks {network_names} on port {args.port}")
-
-    if args.lookup:
-        print(f"Looking up")
+    if args.announce or args.lookup or args.continuous:
+        asyncio.run(run_async_tasks())
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
