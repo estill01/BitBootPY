@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bitbootpy"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["estill01 <ehs.stillman@gmail.com>"]
 readme = "README.md"
