@@ -25,6 +25,7 @@ class BitBootConfig:
         retry_delay: float = 5.0,
         continuous_mode: Optional[Dict[str, bool]] = None,
         network_names: Optional[List[str]] = None,
+        print_discovered_peers: bool = True,
     ):
         self.bootstrap_nodes = bootstrap_nodes or [
             ("router.utorrent.com", 6881),
@@ -37,6 +38,12 @@ class BitBootConfig:
         self.retry_delay = retry_delay
         self.continuous_mode = continuous_mode or {}
         self.network_names = network_names or []
+        self.print_discovered_peers = print_discovered_peers
+
+    def load_network_names_from_file(self, file_path: str) -> None:
+        with open(file_path, "r") as f:
+            network_names = [line.strip() for line in f.readlines()]
+            self.network_names = network_names
 
 class DHTManager:
     def __init__(self, bootstrap_nodes: List[Tuple[str, int]] = None):
@@ -115,7 +122,6 @@ class BitBoot:
 
         await asyncio.gather(*tasks)
 
-
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to lookup network"))
     async def _lookup_single(self, network_name: str, num_searches: int, delay: int) -> None:
         info_hash = hashlib.sha1(network_name.encode()).digest()
@@ -131,11 +137,13 @@ class BitBoot:
         # Update the discovered peers for this network
         self._discovered_peers[network_name] = found_peers
 
-        # Write discovered peers to a file
+        # Write discovered peers to a file and print to stdout if enabled
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(f"{network_name}_peers.txt", "w") as f:
             for peer in found_peers:
                 f.write(f"{peer}\n")
-                print(f"Discovered peer: {peer}")
+                if self.config.print_discovered_peers:
+                    print(f"[{now}] {network_name}: {peer}")
 
 
     # -----------------------
@@ -184,6 +192,12 @@ class BitBoot:
     def continuous_mode_status(self) -> Dict[str, bool]:
         return self._continuous_mode
 
+
+# =======================
+# CLI
+# -----------------------
+# =======================
+
 def main(argv: List[str]):
     parser = argparse.ArgumentParser(
         description="BitBoot: A tool for decentralized peer discovery in P2P networks"
@@ -220,16 +234,30 @@ def main(argv: List[str]):
         metavar="CONFIG_PATH",
         help="Path to a configuration file",
     )
+    parser.add_argument(
+        "--network-names-file",
+        metavar="FILE_PATH",
+        help="Load network names from a file (one name per line)",
+    )
+    parse.add_argument(
+       "--print-discovered-peers",
+        action="store_true",
+        help="Print discovered peers to stdout",
+    )
 
     args = parser.parse_args(argv)
 
-    config = BitBootConfig()
+    config = BitBootConfig(print_discovered_peers=args.print_discovered_peers)
+
 
     if args.config:
         # Load configuration from the file
         with open(args.config, "r") as f:
             loaded_config = json.load(f)
         config = BitBootConfig(**loaded_config)
+
+    if args.network_names_file:
+        config.load_network_names_from_file(args.network_names_file)
 
     bitboot = BitBoot(config=config)
 
