@@ -62,8 +62,10 @@ class BitBoot:
 
         info_hash = self._generate_info_hash(network_name)
         found_peers = set()
+        filename = f"{network_name}_peers.txt"
 
-        with open("discovered_peers.txt", "w") as f:
+
+        with open(filename, "w") as f:
             for _ in range(num_searches):
                 query = f"get_peers {info_hash.hex()}"
                 for node in self._dht_manager._bootstrap_nodes:
