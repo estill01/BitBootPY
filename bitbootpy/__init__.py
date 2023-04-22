@@ -1,1 +1,1 @@
-from .bitboot import BitBoot
+from bitbootpy.bitbootpy import *

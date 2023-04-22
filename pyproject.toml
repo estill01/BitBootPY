@@ -8,8 +8,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 asyncio = "^3.4.3"
-httpx = "^0.23.3"
 uuid = "^1.30"
+kademlia = "^2.2.2"
+twisted = "^22.10.0"
+tenacity = "^8.2.2"
 
 
 [build-system]
