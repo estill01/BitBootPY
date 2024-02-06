@@ -1,23 +1,7 @@
-# BitBootPY - Fully-Decentralized Peer Discovery For P2P Networks
-
-# Want to start a decentralized network, but don't know any peer IDs?
-# No sweat! BitBootPY has your back.
 from __future__ import annotations
-from typing import Dict, List, Tuple, Optional, Union, Type, TYPE_CHECKING
-import hashlib
-import datetime
-import json
+from typing import List, Tuple
 from kademlia.network import Server
-
-# from twisted.internet import reactor, defer, asyncioreactor
-# from twisted.names import client
-
 import asyncio
-
-from tenacity import retry, wait_fixed, stop_after_attempt
-import logging
-import argparse
-import sys
 
 BT_DHT_DOMAINS = [
     ("dht.transmissionbt.com", 6881),
@@ -33,38 +17,31 @@ BT_DHT_DOMAINS = [
 ]
 
 
-# Managest connection to the BitTorrent network so the main BitBoot class can function
 class DHTManager:
-    def __init__(self, bootstrap_nodes: List[Tuple[str, int]] = BT_DHT_DOMAINS ):
+    def __init__(self, bootstrap_nodes: List[Tuple[str, int]] = BT_DHT_DOMAINS):
         self._server = Server()
-        self._bootstrap_nodes = bootstrap_nodes 
+        self._bootstrap_nodes = bootstrap_nodes
 
     @classmethod
     async def create(cls, bootstrap_nodes: List[Tuple[str, int]] = None):
         print("DHTManager.create()")
         instance = cls(bootstrap_nodes)
-        yield instance._bootstrap_dht()
+        await instance._bootstrap_dht()
         return instance
 
     async def _bootstrap_dht(self):
         print("DHTManager._bootstrap_dht()")
 
-        # need to call(?):
-        # await self._server.listen(5678) # or some other port
+        # Start the server listening on a port
+        await self._server.listen(5678)  # or some other port
 
-        async def resolve_and_bootstrap(node):
-            host, port = node
-
-            # get IP addresses; got it... ; TODO swap this code out
-            ip = await client.getHostByName(host)
-
-            print("DHTManager._bootstrap_dht(): ip = ", ip)
-            yield self._server.bootstrap([(ip, port)])
-
+        # Bootstrap the node by connecting to other known nodes
         for node in self._bootstrap_nodes:
             print("DHTManager._bootstrap_dht(): node = ", node)
-            await resolve_and_bootstrap(node)
-            # reactor.callLater(0, resolve_and_bootstrap, node)
+            await self._server.bootstrap([node])
+
+    def get_routing_table(self) -> List['kademlia.routing.KBucket']:
+        return self._server.protocol.router.buckets
 
     def is_server_started(self) -> bool:
         return bool(self._server.transport)
@@ -72,7 +49,6 @@ class DHTManager:
     async def wait_for_server_start(self):
         while not self._server.transport:
             await asyncio.sleep(0.1)
-
 
     def stop(self):
         self._server.stop()

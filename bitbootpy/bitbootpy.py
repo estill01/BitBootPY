@@ -64,19 +64,19 @@ class BitBoot:
         self._discovered_peers = {name: set() for name in self._network_names}
         self._network_names = network_names or self._config.network_names
 
-
     @classmethod
-    async def create(cls, 
-        config: Optional[BitBootConfig] = None,
-        continuous_mode: Optional[Dict[str, bool]] = None,
-        network_names: Optional[List[str]] = None
-    ) -> BitBoot:
+    async def create(cls,
+                     config: Optional[BitBootConfig] = None,
+                     continuous_mode: Optional[Dict[str, bool]] = None,
+                     network_names: Optional[List[str]] = None
+                     ) -> BitBoot:
 
         instance = cls(config, continuous_mode, network_names)
 
         instance._dht_manager = yield DHTManager.create(instance._config.bootstrap_nodes)
         # why not just await this?
-        instance._bootstrap_dht_task = asyncio.create_task(instance._dht_manager._bootstrap_dht())
+        instance._bootstrap_dht_task = asyncio.create_task(
+            instance._dht_manager._bootstrap_dht())
 
         return instance
 
@@ -88,7 +88,8 @@ class BitBoot:
     # -----------------------
     async def lookup_and_announce(self, creator: Type[BitBoot], network_name: str, port: int, peer_config: Optional[BitBootConfig] = None) -> None:
         if peer_config is None:
-            listening_host, listening_port = creator._dht_manager.get_server().transport.get_extra_info('sockname')
+            listening_host, listening_port = creator._dht_manager.get_server(
+            ).transport.get_extra_info('sockname')
             peer_config = BitBootConfig(
                 bootstrap_nodes=[(listening_host, listening_port)],
                 rate_limit_delay=1.0,
@@ -98,7 +99,6 @@ class BitBoot:
         self._config = peer_config
         await self.announce_peer(network_names=[network_name], port=port)
         await self.lookup(network_names=[network_name])
-
 
     def load_network_names_from_file(filename: str) -> List[str]:
         with open(filename, "r") as f:
@@ -119,7 +119,8 @@ class BitBoot:
 
         tasks = []
         for network_name in network_names:
-            tasks.append(self._lookup_single(network_name, num_searches, delay))
+            tasks.append(self._lookup_single(
+                network_name, num_searches, delay))
 
         await asyncio.gather(*tasks)
 
@@ -135,7 +136,6 @@ class BitBoot:
                 for peer in results:
                     found_peers.add(peer)
 
-
         # Update the discovered peers for this network
         self._discovered_peers[network_name] = found_peers
 
@@ -147,10 +147,10 @@ class BitBoot:
                 if self.config.print_discovered_peers:
                     print(f"[{now}] {network_name}: {peer}")
 
-
     # -----------------------
     # Announce
     # -----------------------
+
     async def announce_peer(self, network_names: Union[str, List[str]], port: int):
         if isinstance(network_names, str):
             network_names = [network_names]
@@ -161,20 +161,22 @@ class BitBoot:
 
         await asyncio.gather(*tasks)
 
-
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to announce peer"))
     async def _announce_peer_single(self, network_name: str, port: int) -> None:
         info_hash = self._generate_info_hash(network_name)
 
-        # set for the network name, your IP and port 
-        await self._dht_manager._server.set(info_hash, (str(reactor.getHost().host), port))
+        # set for the network name, your IP and port
+        host = self._dht_manager.get_server(
+        ).transport.get_extra_info('sockname')[0]
+        await self._dht_manager._server.set(info_hash, (host, port))
 
     # -----------------------
     # Continuous Mode
     # -----------------------
     async def start_continuous_mode(self, network_name: str):
         if network_name not in self._network_names:
-            raise ValueError(f"Network name '{network_name}' is not configured")
+            raise ValueError(
+                f"Network name '{network_name}' is not configured")
 
         self._continuous_mode[network_name] = True
         while self._continuous_mode[network_name]:
@@ -186,4 +188,3 @@ class BitBoot:
 
     def continuous_mode_status(self) -> Dict[str, bool]:
         return self._continuous_mode
-
