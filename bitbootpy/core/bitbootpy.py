@@ -8,7 +8,7 @@ import hashlib
 import datetime
 import logging
 import asyncio
-from bitbootpy.bitbootpy.dht_manager import DHTManager
+from bitbootpy.dht_manager import DHTManager
 
 if TYPE_CHECKING:
     from bitbootpy.bitbootpy import BitBoot
@@ -73,7 +73,7 @@ class BitBoot:
 
         instance = cls(config, continuous_mode, network_names)
 
-        instance._dht_manager = yield DHTManager.create(instance._config.bootstrap_nodes)
+        instance._dht_manager = await DHTManager.create(instance._config.bootstrap_nodes)
         # why not just await this?
         instance._bootstrap_dht_task = asyncio.create_task(
             instance._dht_manager._bootstrap_dht())

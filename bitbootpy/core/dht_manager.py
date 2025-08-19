@@ -1,20 +1,29 @@
 from __future__ import annotations
-from typing import List, Tuple
+from typing import List, Tuple, Set
 from kademlia.network import Server
+from kademlia.routing import KBucket
 import asyncio
 
-BT_DHT_DOMAINS = [
-    ("dht.transmissionbt.com", 6881),
-    ("dht.u-phoria.org", 6881),
-    ("dht.bt.am", 2710),
-    ("dht.ipred.org", 6969),
-    ("dht.pirateparty.gr", 80),
-    ("dht.zoink.nl", 80),
-    ("dht.openbittorrent.com", 80),
-    ("dht.istole.it", 6969),
-    ("dht.ccc.de", 80),
-    ("dht.leechers-paradise.org", 6969)
-]
+
+KNOWN_HOSTS: Dict[str, List[Set[str, int]]]  = {
+        "bit_torrent": [
+            ("dht.transmissionbt.com", 6881),
+            ("dht.u-phoria.org", 6881),
+            ("dht.bt.am", 2710),
+            ("dht.ipred.org", 6969),
+            ("dht.pirateparty.gr", 80),
+            ("dht.zoink.nl", 80),
+            ("dht.openbittorrent.com", 80),
+            ("dht.istole.it", 6969),
+            ("dht.ccc.de", 80),
+            ("dht.leechers-paradise.org", 6969)
+        ],
+        "btc": [(),(),],
+        "sol": [(),()],
+        "eth": [(),()],
+        "ipfs": [(),()],
+        "arweave": [(),()]
+}
 
 
 class DHTManager:
@@ -29,18 +38,16 @@ class DHTManager:
         await instance._bootstrap_dht()
         return instance
 
-    async def _bootstrap_dht(self):
+    async def _bootstrap_dht(self, port: int = 5678):
         print("DHTManager._bootstrap_dht()")
+        await self._server.listen(port)
 
-        # Start the server listening on a port
-        await self._server.listen(5678)  # or some other port
-
-        # Bootstrap the node by connecting to other known nodes
+        # Connect to known nodes
         for node in self._bootstrap_nodes:
             print("DHTManager._bootstrap_dht(): node = ", node)
             await self._server.bootstrap([node])
 
-    def get_routing_table(self) -> List['kademlia.routing.KBucket']:
+    def get_routing_table(self) -> List[KBucket]:
         return self._server.protocol.router.buckets
 
     def is_server_started(self) -> bool:

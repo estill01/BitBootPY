@@ -1,7 +1,7 @@
 import sys
 import os
 import asyncio
-from bitbootpy.bitbootpy import BitBoot, BitBootConfig, DHTManager
+from bitbootpy.core.bitbootpy import BitBoot, BitBootConfig, DHTManager
 
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_dir)
