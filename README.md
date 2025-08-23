@@ -7,7 +7,7 @@
 
 ## Key Features
 - **Piggybacks on the BitTorrent network** \
-Makes a special entry on the BitTorrent DHT (distributed hash table) to enable robust decentralized peer discovery for your network without the need for centralized servers. As long as the BitTorrent network is running, your network will be discoverble. Can be extended to leverage other DHTs if necessary.
+Makes a special entry on the BitTorrent DHT (distributed hash table) to enable robust decentralized peer discovery for your network without the need for centralized servers. As long as the BitTorrent network is running, your network will be discoverable. Can be extended to leverage other DHTs if necessary.
 
 - **Self-Healing** \
 Enables networks to easily re-form even if all nodes go offline.
@@ -15,8 +15,14 @@ Enables networks to easily re-form even if all nodes go offline.
 - **Easy-to-use**\
 A simple API for creating and joining decentralized networks
 
-- **Async support**\
-Supports both synchronous and asynchronous operation
+- **Async-first design**\
+Built on ``asyncio`` for high concurrency.
+
+- **Multi-network support**\
+Switch between different DHT networks or register your own at runtime using helper utilities.
+
+- **Command-line interface**\
+Announce or look up peers from the terminal and optionally poll continuously for new peers.
 
 ## How it works
 When you make a network using BitBoot / BitBootPy, you make an entry on the BitTorrent DHT with a unique key identifying your network. Anyone who wants to join your network then just has to search the BitTorrent DHT for that key, and then connect to your machine using the IP data contained in the DHT entry. Done and done. You now have a P2P network that is fully robust to all nodes going offline and does not require a central server for peer discovery.
@@ -39,5 +45,15 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-For more examples and details on how to use BitBootPy, see the `examples` directory.
+For more examples and details on how to use BitBootPy, see the `bitbootpy/examples` directory.
+
+## Command-line interface
+Run the CLI to announce or discover peers without writing code:
+
+```bash
+python -m bitbootpy.applications.cli --announce mynet --peer-host 127.0.0.1 --peer-port 6881
+python -m bitbootpy.applications.cli --lookup mynet
+```
+
+Use ``--continuous mynet`` to poll for peers continuously or ``--help`` for all options.
 
