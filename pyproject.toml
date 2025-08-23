@@ -12,6 +12,7 @@ uuid = "^1.30"
 kademlia = "^2.2.2"
 twisted = "^22.10.0"
 tenacity = "^8.2.2"
+typing_extensions = ">=4.7"
 
 
 [build-system]

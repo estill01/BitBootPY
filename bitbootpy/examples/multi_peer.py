@@ -1,7 +1,7 @@
 import sys
 import os
 import asyncio
-from bitbootpy.core.bitbootpy import BitBoot, BitBootConfig, DHTManager
+from bitbootpy import BitBoot, BitBootConfig
 
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_dir)
@@ -27,12 +27,11 @@ async def main():
     await creator.announce_peer(network_names=[network_name], port=8000)
 
     # Simulate multiple peers joining the network
-    peer_ip_addresses = ["127.0.0.1", "127.0.0.1", "127.0.0.1"]
     peer_ports = [8001, 8002, 8003]
 
-    listening_host, listening_port = creator._dht_manager.get_server().transport.get_extra_info('sockname')
+    listening_host = creator._dht_manager.get_listening_host()
     custom_peer_config = BitBootConfig(
-        bootstrap_nodes=[(listening_host, listening_port)],
+        bootstrap_nodes=[listening_host],
         rate_limit_delay=1.0,
         max_retries=3,
         retry_delay=5.0,
