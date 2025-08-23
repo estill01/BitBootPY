@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from kademlia.network import Server
 from kademlia.routing import KBucket
 import asyncio
 
-from .known_hosts import KNOWN_HOSTS, KnownHost, DHTConfig, DHTBackend
+from .known_hosts import KNOWN_HOSTS, KnownHost, DHTConfig, DHTBackend, DHTNetwork
 
 
 class DHTManager:
@@ -80,3 +80,22 @@ class DHTManager:
             raise RuntimeError("DHT server not started")
         host, port = self._server.transport.get_extra_info("sockname")
         return KnownHost(host, port)
+
+    async def switch_network(
+        self,
+        network: Union[str, DHTNetwork],
+        bootstrap_nodes: Optional[List[KnownHost]] = None,
+    ) -> None:
+        """Switch the underlying DHT network and re-bootstrap the server."""
+
+        self.stop()
+        self._config = DHTConfig(
+            network=DHTNetwork(network),
+            backend=self._config.backend,
+            listen=self._config.listen,
+        )
+        self._server = Server()
+        self._bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(
+            self._config.network, []
+        )
+        await self._bootstrap_dht()
