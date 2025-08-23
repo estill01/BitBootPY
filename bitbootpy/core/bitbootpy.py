@@ -9,7 +9,7 @@ import datetime
 import logging
 import asyncio
 from .dht_manager import DHTManager
-from .known_hosts import KnownHost, KNOWN_HOSTS, DHTConfig
+from .known_hosts import KnownHost, KNOWN_HOSTS, DHTConfig, DHTNetwork
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,6 +78,23 @@ class BitBoot:
 
     def __del__(self):
         self._dht_manager.stop()
+
+    async def switch_dht_network(
+        self,
+        network: Union[str, DHTNetwork],
+        bootstrap_nodes: Optional[List[KnownHost]] = None,
+    ) -> None:
+        """Switch the underlying DHT network BitBoot operates on."""
+
+        await self._dht_manager.switch_network(network, bootstrap_nodes)
+        self._config.dht = DHTConfig(
+            network=DHTNetwork(network),
+            backend=self._config.dht.backend,
+            listen=self._config.dht.listen,
+        )
+        self._config.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(
+            DHTNetwork(network), []
+        )
 
     # -----------------------
     # Util
@@ -149,7 +166,14 @@ class BitBoot:
             results = await self._dht_manager._server.get(info_hash)
             if results:
                 for peer in results:
-                    found_peers.add(peer)
+                    if isinstance(peer, tuple):
+                        found_peers.add(peer)
+                    elif isinstance(peer, str):
+                        try:
+                            host, port = peer.split(":")
+                            found_peers.add((host, int(port)))
+                        except ValueError:
+                            continue
 
         # Update the discovered peers for this network
         self._discovered_peers[network_name] = found_peers
@@ -186,7 +210,11 @@ class BitBoot:
 
         info_hash = self._generate_info_hash(network_name)
 
-        await self._dht_manager._server.set(info_hash, peer.as_tuple())
+        # Store the peer as a "host:port" string because the underlying
+        # Kademlia implementation only accepts primitive value types.
+        await self._dht_manager._server.set(
+            info_hash, f"{peer.host}:{peer.port}"
+        )
 
     # -----------------------
     # Continuous Mode
