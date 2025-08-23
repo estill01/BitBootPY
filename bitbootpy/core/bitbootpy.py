@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional, Union, Type, TYPE_CHECKING
+from typing import Dict, List, Optional, Union, Type
 from tenacity import retry, wait_fixed, stop_after_attempt
 import hashlib
 import datetime
 import logging
 import asyncio
-from bitbootpy.dht_manager import DHTManager
-
-if TYPE_CHECKING:
-    from bitbootpy.bitbootpy import BitBoot
+from .dht_manager import DHTManager
+from .known_hosts import KnownHost
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 class BitBootConfig:
     def __init__(
         self,
-        bootstrap_nodes: Optional[List[Tuple[str, int]]] = None,
+        bootstrap_nodes: Optional[List[KnownHost]] = None,
         rate_limit_delay: float = 1.0,
         max_retries: int = 3,
         retry_delay: float = 5.0,
@@ -31,10 +29,10 @@ class BitBootConfig:
         print_discovered_peers: bool = True,
     ):
         self.bootstrap_nodes = bootstrap_nodes or [
-            ("router.utorrent.com", 6881),
-            ("router.bittorrent.com", 6881),
-            ("dht.transmissionbt.com", 6881),
-            ("dht.aelitis.com", 6881),
+            KnownHost("router.utorrent.com", 6881),
+            KnownHost("router.bittorrent.com", 6881),
+            KnownHost("dht.transmissionbt.com", 6881),
+            KnownHost("dht.aelitis.com", 6881),
         ]
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
@@ -61,8 +59,8 @@ class BitBoot:
 
         # Reconcile constructor args with BitBootConfig values
         self._continuous_mode = continuous_mode or self._config.continuous_mode
-        self._discovered_peers = {name: set() for name in self._network_names}
         self._network_names = network_names or self._config.network_names
+        self._discovered_peers = {name: set() for name in self._network_names}
 
     @classmethod
     async def create(cls,
@@ -74,10 +72,6 @@ class BitBoot:
         instance = cls(config, continuous_mode, network_names)
 
         instance._dht_manager = await DHTManager.create(instance._config.bootstrap_nodes)
-        # why not just await this?
-        instance._bootstrap_dht_task = asyncio.create_task(
-            instance._dht_manager._bootstrap_dht())
-
         return instance
 
     def __del__(self):
@@ -91,15 +85,16 @@ class BitBoot:
             listening_host, listening_port = creator._dht_manager.get_server(
             ).transport.get_extra_info('sockname')
             peer_config = BitBootConfig(
-                bootstrap_nodes=[(listening_host, listening_port)],
+                bootstrap_nodes=[KnownHost(listening_host, listening_port)],
                 rate_limit_delay=1.0,
                 max_retries=3,
                 retry_delay=5.0,
             )
         self._config = peer_config
-        await self.announce_peer(network_names=[network_name], port=port)
-        await self.lookup(network_names=[network_name])
+        await self.announce_peer(network_name, port=port)
+        await self.lookup(network_name)
 
+    @staticmethod
     def load_network_names_from_file(filename: str) -> List[str]:
         with open(filename, "r") as f:
             return [line.strip() for line in f.readlines()]
@@ -113,14 +108,15 @@ class BitBoot:
     # -----------------------
     # Lookup
     # -----------------------
-    async def lookup(self, network_name: str, num_searches: int = 10, delay: int = 5):
+    async def lookup(
+        self, network_names: Union[str, List[str]], num_searches: int = 10, delay: int = 5
+    ):
         if isinstance(network_names, str):
             network_names = [network_names]
 
         tasks = []
         for network_name in network_names:
-            tasks.append(self._lookup_single(
-                network_name, num_searches, delay))
+            tasks.append(self._lookup_single(network_name, num_searches, delay))
 
         await asyncio.gather(*tasks)
 
@@ -144,7 +140,7 @@ class BitBoot:
         with open(f"{network_name}_peers.txt", "w") as f:
             for peer in found_peers:
                 f.write(f"{peer}\n")
-                if self.config.print_discovered_peers:
+                if self._config.print_discovered_peers:
                     print(f"[{now}] {network_name}: {peer}")
 
     # -----------------------
@@ -180,7 +176,7 @@ class BitBoot:
 
         self._continuous_mode[network_name] = True
         while self._continuous_mode[network_name]:
-            await self.lookup([network_name])
+            await self.lookup(network_name)
             await asyncio.sleep(self._config.rate_limit_delay)
 
     def stop_continuous_mode(self, network_name: str):

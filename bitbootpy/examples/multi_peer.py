@@ -2,6 +2,7 @@ import sys
 import os
 import asyncio
 from bitbootpy.core.bitbootpy import BitBoot, BitBootConfig, DHTManager
+from bitbootpy.core.known_hosts import KnownHost
 
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_dir)
@@ -32,7 +33,7 @@ async def main():
 
     listening_host, listening_port = creator._dht_manager.get_server().transport.get_extra_info('sockname')
     custom_peer_config = BitBootConfig(
-        bootstrap_nodes=[(listening_host, listening_port)],
+        bootstrap_nodes=[KnownHost(listening_host, listening_port)],
         rate_limit_delay=1.0,
         max_retries=3,
         retry_delay=5.0,
