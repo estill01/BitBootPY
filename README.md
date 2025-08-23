@@ -1,6 +1,6 @@
 # BitBootPy: Fully-Decentralized Peer Discovery For P2P Network Formation
 
-###### Inspired and based on the BitBoot (Javascript) project: [https://github.com/tintfoundation/bitboot]()
+###### Originally inspired by the BitBoot (Javascript) project: [https://github.com/tintfoundation/bitboot]()
 
 `BitBootPy` is a Python library that enables fully-decentralized P2P network Peer Discovery and network formation. No centralized infrastructure is required to start or join a P2P network which uses `BitBootPy` for Peer Discovery. If you're tempted to use WebRTC for P2P network formation, you should be aware that WebRTC does require a centralized Peer Discovery server.
 
