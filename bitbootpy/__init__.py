@@ -9,7 +9,6 @@ from .core.dht_network import (
     KnownHost,
     DHTConfig,
     DHTNetwork,
-    DHTBackend,
     DHT_NETWORK_REGISTRY,
 )
 from .core.network import Network, NETWORK_REGISTRY
@@ -20,7 +19,6 @@ __all__ = [
     "KnownHost",
     "DHTConfig",
     "DHTNetwork",
-    "DHTBackend",
     "DHT_NETWORK_REGISTRY",
     "Network",
     "NETWORK_REGISTRY",

@@ -201,7 +201,7 @@ class BitBoot:
 
         for _ in range(num_searches):
             await asyncio.sleep(delay)
-            results = await manager.get_server().get(info_hash)
+            results = await manager.get(info_hash)
             if results:
                 for peer in results:
                     if isinstance(peer, tuple):
@@ -263,7 +263,7 @@ class BitBoot:
 
         info_hash = self._generate_info_hash(network_name)
 
-        await manager.get_server().set(info_hash, f"{peer.host}:{peer.port}")
+        await manager.set(info_hash, f"{peer.host}:{peer.port}")
 
     # -----------------------
     # Continuous Mode

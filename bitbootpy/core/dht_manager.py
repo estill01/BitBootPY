@@ -2,26 +2,25 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Union
 
-from kademlia.network import Server
 from kademlia.routing import KBucket
 import asyncio
 
 from .dht_network import (
     KnownHost,
     DHTConfig,
-    DHTBackend,
     DHTNetwork,
     DHT_NETWORK_REGISTRY,
 )
+from .backends import BACKEND_REGISTRY, BaseDHTBackend
 
 
 class DHTManager:
     """Manage interaction with a DHT backend.
 
-    Only the Kademlia backend is implemented at the moment but the class is
-    structured so that alternative backends can be introduced later.  The
-    manager bootstraps itself using known nodes for the selected network unless
-    explicit bootstrap nodes are supplied.
+    The manager delegates all DHT operations to a pluggable backend selected via
+    the :class:`~bitbootpy.core.dht_network.DHTNetwork` configuration.  Backends
+    are looked up in :data:`bitbootpy.core.backends.BACKEND_REGISTRY` and can be
+    extended by third-party packages.
     """
 
     def __init__(
@@ -31,13 +30,12 @@ class DHTManager:
     ):
         self._config = config or DHTConfig()
 
-        if self._config.network.backend != DHTBackend.KADEMLIA:
-            # Future backends can be selected here
+        backend_factory = BACKEND_REGISTRY.get(self._config.network.backend)
+        if backend_factory is None:
             raise ValueError(
                 f"Unsupported DHT backend: {self._config.network.backend}"
             )
-
-        self._server = Server()
+        self._backend: BaseDHTBackend = backend_factory()
         self._bootstrap_nodes: List[KnownHost] = (
             bootstrap_nodes or self._config.network.bootstrap_hosts
         )
@@ -58,35 +56,46 @@ class DHTManager:
     async def _bootstrap_dht(self) -> None:
         """Start the local DHT node and bootstrap with known peers."""
 
-        await self._server.listen(self._config.listen.port)
+        await self._backend.listen(self._config.listen.port)
 
         # Connect to known nodes
         if self._bootstrap_nodes:
-            await self._server.bootstrap(
+            await self._backend.bootstrap(
                 [node.as_tuple() for node in self._bootstrap_nodes]
             )
 
     def get_routing_table(self) -> List[KBucket]:
-        return self._server.protocol.router.buckets
+        server = getattr(self._backend, "server", None)
+        if server and getattr(server, "protocol", None):
+            return server.protocol.router.buckets
+        return []
 
     def is_server_started(self) -> bool:
-        return bool(self._server.transport)
+        server = getattr(self._backend, "server", None)
+        return bool(getattr(server, "transport", None))
 
     async def wait_for_server_start(self):
-        while not self._server.transport:
+        while not self.is_server_started():
             await asyncio.sleep(0.1)
 
     def stop(self):
-        self._server.stop()
+        self._backend.stop()
+
+    # ------------------------------------------------------------------
+    # Convenience wrappers around backend operations
+    # ------------------------------------------------------------------
+    async def get(self, key: bytes):
+        return await self._backend.get(key)
+
+    async def set(self, key: bytes, value):
+        return await self._backend.set(key, value)
 
     def get_server(self):
-        return self._server
+        """Return the backend instance for direct access if needed."""
+        return self._backend
 
     def get_listening_host(self) -> KnownHost:
-        """Return the address this node is listening on as a ``KnownHost``."""
-        if not self._server.transport:
-            raise RuntimeError("DHT server not started")
-        host, port = self._server.transport.get_extra_info("sockname")
+        host, port = self._backend.get_listening_host()
         return KnownHost(host, port)
 
     async def switch_network(
@@ -105,7 +114,10 @@ class DHTManager:
             net = network
 
         self._config = DHTConfig(network=net, listen=self._config.listen)
-        self._server = Server()
+        backend_factory = BACKEND_REGISTRY.get(net.backend)
+        if backend_factory is None:
+            raise ValueError(f"Unsupported DHT backend: {net.backend}")
+        self._backend = backend_factory()
         self._bootstrap_nodes = bootstrap_nodes or net.bootstrap_hosts
         await self._bootstrap_dht()
 

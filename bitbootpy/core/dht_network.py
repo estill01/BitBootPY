@@ -8,14 +8,7 @@ each network carries its bootstrap hosts and backend information.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Dict, List, Tuple, Optional
-
-
-class DHTBackend(str, Enum):
-    """Enumeration of supported DHT backends."""
-
-    KADEMLIA = "kademlia"
 
 
 @dataclass(frozen=True)
@@ -34,7 +27,7 @@ class DHTNetwork:
     """Description of a DHT network and how to bootstrap it."""
 
     name: str
-    backend: DHTBackend = DHTBackend.KADEMLIA
+    backend: str = "kademlia"
     bootstrap_hosts: List[KnownHost] = field(default_factory=list)
 
 
@@ -82,29 +75,10 @@ class DHTNetworkRegistry:
 DHT_NETWORK_REGISTRY = DHTNetworkRegistry()
 
 
-# Pre-register a few common networks with default bootstrap nodes.  Only the
-# BitTorrent network has real bootstrap nodes at the moment but the registry is
-# ready to hold additional networks as they become available.
-DHT_NETWORK_REGISTRY.add(
-    DHTNetwork(
-        "bit_torrent",
-        bootstrap_hosts=[
-            KnownHost("dht.transmissionbt.com", 6881),
-            KnownHost("dht.u-phoria.org", 6881),
-            KnownHost("dht.bt.am", 2710),
-            KnownHost("dht.ipred.org", 6969),
-            KnownHost("dht.pirateparty.gr", 80),
-            KnownHost("dht.zoink.nl", 80),
-            KnownHost("dht.openbittorrent.com", 80),
-            KnownHost("dht.istole.it", 6969),
-            KnownHost("dht.ccc.de", 80),
-            KnownHost("dht.leechers-paradise.org", 6969),
-        ],
-    )
-)
+# Load all built-in networks which register themselves on import
+from .dhtnetworks import register_all as _register_dht_networks
 
-for name in ["btc", "sol", "eth", "ipfs", "arweave"]:
-    DHT_NETWORK_REGISTRY.add(DHTNetwork(name))
+_register_dht_networks()
 
 
 # ---------------------------------------------------------------------------
