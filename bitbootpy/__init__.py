@@ -5,12 +5,14 @@ This module re-exports the public classes from the core implementation so that
 """
 
 from .core.bitbootpy import BitBoot, BitBootConfig
-from .core.known_hosts import (
+from .core.dht_network import (
     KnownHost,
     DHTConfig,
     DHTNetwork,
     DHTBackend,
+    DHT_NETWORK_REGISTRY,
 )
+from .core.network import Network, NETWORK_REGISTRY
 
 __all__ = [
     "BitBoot",
@@ -19,4 +21,7 @@ __all__ = [
     "DHTConfig",
     "DHTNetwork",
     "DHTBackend",
+    "DHT_NETWORK_REGISTRY",
+    "Network",
+    "NETWORK_REGISTRY",
 ]
