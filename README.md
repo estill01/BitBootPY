@@ -6,8 +6,8 @@
 
 
 ## Key Features
-- **Piggybacks on the BitTorrent network** \
-Makes a special entry on the BitTorrent DHT (distributed hash table) to enable robust decentralized peer discovery for your network without the need for centralized servers. As long as the BitTorrent network is running, your network will be discoverable. Can be extended to leverage other DHTs if necessary.
+- **Leverages existing DHT networks** \
+Creates a special entry on your chosen DHT (e.g., BitTorrent) to enable robust decentralized peer discovery for your network without the need for centralized servers. As long as that DHT network is running, your network will be discoverable.
 
 - **Self-Healing** \
 Enables networks to easily re-form even if all nodes go offline.
@@ -25,7 +25,7 @@ Switch between different DHT networks or register your own at runtime using help
 Announce or look up peers from the terminal and optionally poll continuously for new peers.
 
 ## How it works
-When you make a network using BitBoot / BitBootPy, you make an entry on the BitTorrent DHT with a unique key identifying your network. Anyone who wants to join your network then just has to search the BitTorrent DHT for that key, and then connect to your machine using the IP data contained in the DHT entry. Done and done. You now have a P2P network that is fully robust to all nodes going offline and does not require a central server for peer discovery.
+When you make a network using BitBoot / BitBootPy, you make an entry on the selected DHT (such as the BitTorrent DHT) with a unique key identifying your network. Anyone who wants to join then searches that DHT for the key and connects to your machine using the IP data contained in the entry. Done and done. You now have a P2P network that is fully robust to all nodes going offline and does not require a central server for peer discovery.
 
 
 ## Usage
