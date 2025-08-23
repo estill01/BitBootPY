@@ -61,7 +61,6 @@ class BitBoot:
         self._continuous_mode = continuous_mode or self._config.continuous_mode
         self._network_names = network_names or self._config.network_names
         self._discovered_peers = {name: set() for name in self._network_names}
-
         self._dht_manager = DHTManager(
             self._config.bootstrap_nodes,
             network=self._config.dht_network,
@@ -77,7 +76,6 @@ class BitBoot:
                      ) -> BitBoot:
 
         instance = cls(config, continuous_mode, network_names)
-
         instance._dht_manager = await DHTManager.create(
             instance._config.bootstrap_nodes,
             network=instance._config.dht_network,
