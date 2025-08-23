@@ -1,7 +1,7 @@
 import sys
 import os
 import asyncio
-from bitbootpy import BitBoot, BitBootConfig
+from bitbootpy import BitBoot, BitBootConfig, KnownHost
 
 
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -14,7 +14,11 @@ async def main():
 
     # Initialize the BitBoot class for the creator of the network
     creator_config = BitBootConfig(
-        bootstrap_nodes=None, rate_limit_delay=1.0, max_retries=3, retry_delay=5.0, continuous_mode=True
+        bootstrap_nodes=None,
+        rate_limit_delay=1.0,
+        max_retries=3,
+        retry_delay=5.0,
+        continuous_mode={},
     )
     creator = await BitBoot.create(config=creator_config)
 
@@ -23,14 +27,16 @@ async def main():
         await asyncio.sleep(0.1)
 
     await creator._dht_manager.wait_for_server_start()
+    listening_host = creator._dht_manager.get_listening_host()
 
     print(f"Announcing network {network_name}..")
-    await creator.announce_peer(network_names=[network_name], port=8000)
+    await creator.announce_peer(
+        network_names=[network_name],
+        peer=KnownHost(listening_host.host, 8000),
+    )
 
     # Simulate multiple peers joining the network
     peer_ports = [8001, 8002, 8003]
-
-    listening_host = creator._dht_manager.get_listening_host()
     custom_peer_config = BitBootConfig(
         bootstrap_nodes=[listening_host],
         rate_limit_delay=1.0,
@@ -40,9 +46,22 @@ async def main():
 
     peers = [BitBoot() for _ in range(len(peer_ports))]
     tasks = [
-        peers[0].lookup_and_announce(creator, network_name, peer_ports[0], custom_peer_config),
-        peers[1].lookup_and_announce(creator, network_name, peer_ports[1]),
-        peers[2].lookup_and_announce(creator, network_name, peer_ports[2]),
+        peers[0].lookup_and_announce(
+            creator,
+            network_name,
+            KnownHost(listening_host.host, peer_ports[0]),
+            custom_peer_config,
+        ),
+        peers[1].lookup_and_announce(
+            creator,
+            network_name,
+            KnownHost(listening_host.host, peer_ports[1]),
+        ),
+        peers[2].lookup_and_announce(
+            creator,
+            network_name,
+            KnownHost(listening_host.host, peer_ports[2]),
+        ),
     ]
     await asyncio.gather(*tasks)
 
@@ -55,3 +74,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

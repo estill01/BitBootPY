@@ -9,7 +9,7 @@ import datetime
 import logging
 import asyncio
 from .dht_manager import DHTManager
-from .known_hosts import KnownHost, KNOWN_HOSTS
+from .known_hosts import KnownHost, KNOWN_HOSTS, DHTConfig
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,20 +27,16 @@ class BitBootConfig:
         continuous_mode: Optional[Dict[str, bool]] = None,
         network_names: Optional[List[str]] = None,
         print_discovered_peers: bool = True,
-        dht_network: str = "bit_torrent",
-        dht_backend: str = "kademlia",
-        listen_port: int = 5678,
+        dht: Optional[DHTConfig] = None,
     ):
-        self.dht_network = dht_network
-        self.dht_backend = dht_backend
-        self.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(dht_network, [])
+        self.dht = dht or DHTConfig()
+        self.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(self.dht.network, [])
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.continuous_mode = continuous_mode or {}
         self.network_names = network_names or []
         self.print_discovered_peers = print_discovered_peers
-        self.listen_port = listen_port
 
     def load_network_names_from_file(self, file_path: str) -> None:
         with open(file_path, "r") as f:
@@ -63,9 +59,7 @@ class BitBoot:
         self._discovered_peers = {name: set() for name in self._network_names}
         self._dht_manager = DHTManager(
             self._config.bootstrap_nodes,
-            network=self._config.dht_network,
-            backend=self._config.dht_backend,
-            listen_port=self._config.listen_port,
+            config=self._config.dht,
         )
 
     @classmethod
@@ -78,9 +72,7 @@ class BitBoot:
         instance = cls(config, continuous_mode, network_names)
         instance._dht_manager = await DHTManager.create(
             instance._config.bootstrap_nodes,
-            network=instance._config.dht_network,
-            backend=instance._config.dht_backend,
-            listen_port=instance._config.listen_port,
+            config=instance._config.dht,
         )
         return instance
 
@@ -90,7 +82,25 @@ class BitBoot:
     # -----------------------
     # Util
     # -----------------------
-    async def lookup_and_announce(self, creator: Type[BitBoot], network_name: str, port: int, peer_config: Optional[BitBootConfig] = None) -> None:
+    async def lookup_and_announce(
+        self,
+        creator: Type[BitBoot],
+        network_name: str,
+        peer: KnownHost,
+        peer_config: Optional[BitBootConfig] = None,
+    ) -> None:
+        """Announce a peer to a network and then perform a lookup.
+
+        This helper is primarily used in examples where a peer first needs to
+        make itself known and then query for other peers.
+
+        Args:
+            creator: The ``BitBoot`` instance acting as the network creator.
+            network_name: Name of the network to interact with.
+            peer: The peer address to announce.
+            peer_config: Optional configuration for the announcing peer.
+        """
+
         if peer_config is None:
             listening_host = creator._dht_manager.get_listening_host()
             peer_config = BitBootConfig(
@@ -100,7 +110,7 @@ class BitBoot:
                 retry_delay=5.0,
             )
         self._config = peer_config
-        await self.announce_peer(network_name, port=port)
+        await self.announce_peer(network_name, peer)
         await self.lookup(network_name)
 
     @staticmethod
@@ -156,23 +166,27 @@ class BitBoot:
     # Announce
     # -----------------------
 
-    async def announce_peer(self, network_names: Union[str, List[str]], port: int):
+    async def announce_peer(
+        self, network_names: Union[str, List[str]], peer: KnownHost
+    ):
+        """Announce a peer address for one or more network names."""
+
         if isinstance(network_names, str):
             network_names = [network_names]
 
         tasks = []
         for network_name in network_names:
-            tasks.append(self._announce_peer_single(network_name, port))
+            tasks.append(self._announce_peer_single(network_name, peer))
 
         await asyncio.gather(*tasks)
 
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to announce peer"))
-    async def _announce_peer_single(self, network_name: str, port: int) -> None:
+    async def _announce_peer_single(self, network_name: str, peer: KnownHost) -> None:
+        """Announce a single peer address to the DHT."""
+
         info_hash = self._generate_info_hash(network_name)
 
-        # set for the network name, your IP and port
-        host = self._dht_manager.get_listening_host().host
-        await self._dht_manager._server.set(info_hash, (host, port))
+        await self._dht_manager._server.set(info_hash, peer.as_tuple())
 
     # -----------------------
     # Continuous Mode
