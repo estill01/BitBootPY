@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 from typing import List, Optional
 
 from kademlia.network import Server
 from kademlia.routing import KBucket
 import asyncio
 
-from .known_hosts import KNOWN_HOSTS, KnownHost
+from .known_hosts import KNOWN_HOSTS, KnownHost, DHTConfig, DHTBackend
 
 
 class DHTManager:
@@ -20,52 +21,41 @@ class DHTManager:
     def __init__(
         self,
         bootstrap_nodes: Optional[List[KnownHost]] = None,
-        network: str = "bit_torrent",
-        backend: str = "kademlia",
-        listen_port: int = 5678,
-
+        config: Optional[DHTConfig] = None,
     ):
-        if backend != "kademlia":
+        self._config = config or DHTConfig()
+
+        if self._config.backend != DHTBackend.KADEMLIA:
             # Future backends can be selected here
-            raise ValueError(f"Unsupported DHT backend: {backend}")
+            raise ValueError(f"Unsupported DHT backend: {self._config.backend}")
 
         self._server = Server()
-        self._network = network
         self._bootstrap_nodes: List[KnownHost] = bootstrap_nodes or KNOWN_HOSTS.get(
-            network, []
+            self._config.network, []
         )
-        self._backend = backend
-        self._listen_port = listen_port
 
 
     @classmethod
     async def create(
         cls,
         bootstrap_nodes: Optional[List[KnownHost]] = None,
-        network: str = "bit_torrent",
-        backend: str = "kademlia",
-        listen_port: int = 5678,
+        config: Optional[DHTConfig] = None,
     ) -> "DHTManager":
         """Asynchronously create and bootstrap a :class:`DHTManager`."""
 
-        instance = cls(
-            bootstrap_nodes,
-            network=network,
-            backend=backend,
-            listen_port=listen_port,
-        )
+        instance = cls(bootstrap_nodes, config=config)
         await instance._bootstrap_dht()
         return instance
 
     async def _bootstrap_dht(self) -> None:
         """Start the local DHT node and bootstrap with known peers."""
 
-        await self._server.listen(self._listen_port)
+        await self._server.listen(self._config.listen.port)
 
         # Connect to known nodes
         if self._bootstrap_nodes:
             await self._server.bootstrap(
-                [(node.host, node.port) for node in self._bootstrap_nodes]
+                [node.as_tuple() for node in self._bootstrap_nodes]
             )
 
     def get_routing_table(self) -> List[KBucket]:

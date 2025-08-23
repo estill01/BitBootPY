@@ -23,20 +23,21 @@ When you make a network using BitBoot / BitBootPy, you make an entry on the BitT
 
 
 ## Usage
-To use BitBoot, simply create an instance of the AsyncBitBoot class with a unique key, and call the announce and lookup methods to join the network and discover peers. Here's a simple example:
+To use BitBootPy, create a :class:`BitBoot` instance and announce a
+:class:`KnownHost` before looking up peers. Here's a simple example:
 
 ```python
-from bitboot.async_bitboot import AsyncBitBoot
+import asyncio
+from bitbootpy import BitBoot, BitBootConfig, KnownHost
 
 async def main():
-    bot = AsyncBitBoot("unique_key")
-    info_hash = await bot.announce()
-    found_peers = await bot.lookup(info_hash)
-    print("Found peers:", found_peers)
-    bot.stop()
+    bitboot = await BitBoot.create(BitBootConfig())
+    await bitboot.announce_peer("unique_network", KnownHost("127.0.0.1", 6881))
+    await bitboot.lookup("unique_network")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-For more examples and details on how to use BitBoot, see the `examples` directory.
+For more examples and details on how to use BitBootPy, see the `examples` directory.
+

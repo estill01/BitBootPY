@@ -1,11 +1,17 @@
-import bitbootpy
+"""Basic example demonstrating announcing and looking up peers."""
+
+import asyncio
+
+from bitbootpy import BitBoot, BitBootConfig, KnownHost
+
+
+async def main() -> None:
+    bitboot = await BitBoot.create(BitBootConfig())
+    await bitboot.announce_peer("example_network", KnownHost("127.0.0.1", 6881))
+    await bitboot.lookup("example_network")
+
 
 if __name__ == "__main__":
-    bitboot = BitBoot()
+    asyncio.run(main())
 
-    # Announce peer
-    bitboot.announce_peer("example_network", 6881)
 
-    # Discover peers
-    for discovered_peer in bitboot.lookup("example_network"):
-        print("Discovered peer:", discovered_peer)
