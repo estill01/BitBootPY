@@ -9,7 +9,7 @@ import datetime
 import logging
 import asyncio
 from .dht_manager import DHTManager
-from .known_hosts import KnownHost
+from .known_hosts import KnownHost, KNOWN_HOSTS
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,19 +27,20 @@ class BitBootConfig:
         continuous_mode: Optional[Dict[str, bool]] = None,
         network_names: Optional[List[str]] = None,
         print_discovered_peers: bool = True,
+        dht_network: str = "bit_torrent",
+        dht_backend: str = "kademlia",
+        listen_port: int = 5678,
     ):
-        self.bootstrap_nodes = bootstrap_nodes or [
-            KnownHost("router.utorrent.com", 6881),
-            KnownHost("router.bittorrent.com", 6881),
-            KnownHost("dht.transmissionbt.com", 6881),
-            KnownHost("dht.aelitis.com", 6881),
-        ]
+        self.dht_network = dht_network
+        self.dht_backend = dht_backend
+        self.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(dht_network, [])
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.continuous_mode = continuous_mode or {}
         self.network_names = network_names or []
         self.print_discovered_peers = print_discovered_peers
+        self.listen_port = listen_port
 
     def load_network_names_from_file(self, file_path: str) -> None:
         with open(file_path, "r") as f:
@@ -55,12 +56,17 @@ class BitBoot:
         network_names: Optional[List[str]] = None,
     ):
         self._config = config or BitBootConfig()
-        self._dht_manager = DHTManager(self._config.bootstrap_nodes)
 
         # Reconcile constructor args with BitBootConfig values
         self._continuous_mode = continuous_mode or self._config.continuous_mode
         self._network_names = network_names or self._config.network_names
         self._discovered_peers = {name: set() for name in self._network_names}
+        self._dht_manager = DHTManager(
+            self._config.bootstrap_nodes,
+            network=self._config.dht_network,
+            backend=self._config.dht_backend,
+            listen_port=self._config.listen_port,
+        )
 
     @classmethod
     async def create(cls,
@@ -70,8 +76,12 @@ class BitBoot:
                      ) -> BitBoot:
 
         instance = cls(config, continuous_mode, network_names)
-
-        instance._dht_manager = await DHTManager.create(instance._config.bootstrap_nodes)
+        instance._dht_manager = await DHTManager.create(
+            instance._config.bootstrap_nodes,
+            network=instance._config.dht_network,
+            backend=instance._config.dht_backend,
+            listen_port=instance._config.listen_port,
+        )
         return instance
 
     def __del__(self):
@@ -82,10 +92,9 @@ class BitBoot:
     # -----------------------
     async def lookup_and_announce(self, creator: Type[BitBoot], network_name: str, port: int, peer_config: Optional[BitBootConfig] = None) -> None:
         if peer_config is None:
-            listening_host, listening_port = creator._dht_manager.get_server(
-            ).transport.get_extra_info('sockname')
+            listening_host = creator._dht_manager.get_listening_host()
             peer_config = BitBootConfig(
-                bootstrap_nodes=[KnownHost(listening_host, listening_port)],
+                bootstrap_nodes=[listening_host],
                 rate_limit_delay=1.0,
                 max_retries=3,
                 retry_delay=5.0,
@@ -162,8 +171,7 @@ class BitBoot:
         info_hash = self._generate_info_hash(network_name)
 
         # set for the network name, your IP and port
-        host = self._dht_manager.get_server(
-        ).transport.get_extra_info('sockname')[0]
+        host = self._dht_manager.get_listening_host().host
         await self._dht_manager._server.set(info_hash, (host, port))
 
     # -----------------------

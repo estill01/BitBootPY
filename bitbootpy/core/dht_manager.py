@@ -22,6 +22,8 @@ class DHTManager:
         bootstrap_nodes: Optional[List[KnownHost]] = None,
         network: str = "bit_torrent",
         backend: str = "kademlia",
+        listen_port: int = 5678,
+
     ):
         if backend != "kademlia":
             # Future backends can be selected here
@@ -33,6 +35,8 @@ class DHTManager:
             network, []
         )
         self._backend = backend
+        self._listen_port = listen_port
+
 
     @classmethod
     async def create(
@@ -40,21 +44,29 @@ class DHTManager:
         bootstrap_nodes: Optional[List[KnownHost]] = None,
         network: str = "bit_torrent",
         backend: str = "kademlia",
+        listen_port: int = 5678,
     ) -> "DHTManager":
         """Asynchronously create and bootstrap a :class:`DHTManager`."""
 
-        instance = cls(bootstrap_nodes, network=network, backend=backend)
+        instance = cls(
+            bootstrap_nodes,
+            network=network,
+            backend=backend,
+            listen_port=listen_port,
+        )
         await instance._bootstrap_dht()
         return instance
 
-    async def _bootstrap_dht(self, port: int = 5678) -> None:
+    async def _bootstrap_dht(self) -> None:
         """Start the local DHT node and bootstrap with known peers."""
 
-        await self._server.listen(port)
+        await self._server.listen(self._listen_port)
 
         # Connect to known nodes
-        for node in self._bootstrap_nodes:
-            await self._server.bootstrap([(node.host, node.port)])
+        if self._bootstrap_nodes:
+            await self._server.bootstrap(
+                [(node.host, node.port) for node in self._bootstrap_nodes]
+            )
 
     def get_routing_table(self) -> List[KBucket]:
         return self._server.protocol.router.buckets
@@ -71,3 +83,10 @@ class DHTManager:
 
     def get_server(self):
         return self._server
+
+    def get_listening_host(self) -> KnownHost:
+        """Return the address this node is listening on as a ``KnownHost``."""
+        if not self._server.transport:
+            raise RuntimeError("DHT server not started")
+        host, port = self._server.transport.get_extra_info("sockname")
+        return KnownHost(host, port)
