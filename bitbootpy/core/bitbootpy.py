@@ -8,8 +8,14 @@ import hashlib
 import datetime
 import logging
 import asyncio
-from .dht_manager import DHTManager
-from .known_hosts import KnownHost, KNOWN_HOSTS, DHTConfig, DHTNetwork
+from .dht_manager import DHTManager, MultiDHTManager
+from .dht_network import (
+    KnownHost,
+    DHTConfig,
+    DHTNetwork,
+    DHT_NETWORK_REGISTRY,
+)
+from .network import Network, NETWORK_REGISTRY
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,7 +36,7 @@ class BitBootConfig:
         dht: Optional[DHTConfig] = None,
     ):
         self.dht = dht or DHTConfig()
-        self.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(self.dht.network, [])
+        self.bootstrap_nodes = bootstrap_nodes or self.dht.network.bootstrap_hosts
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -56,10 +62,15 @@ class BitBoot:
         # Reconcile constructor args with BitBootConfig values
         self._continuous_mode = continuous_mode or self._config.continuous_mode
         self._network_names = network_names or self._config.network_names
-        self._discovered_peers = {name: set() for name in self._network_names}
-        self._dht_manager = DHTManager(
-            self._config.bootstrap_nodes,
-            config=self._config.dht,
+        self._network_objs = {
+            name: NETWORK_REGISTRY.create(name) for name in self._network_names
+        }
+        self._discovered_peers: Dict[str, Dict[str, set]] = {
+            name: {} for name in self._network_names
+        }
+        self._dht_manager = MultiDHTManager()
+        self._dht_manager.add_network(
+            self._config.dht.network, self._config.bootstrap_nodes
         )
 
     @classmethod
@@ -70,14 +81,15 @@ class BitBoot:
                      ) -> BitBoot:
 
         instance = cls(config, continuous_mode, network_names)
-        instance._dht_manager = await DHTManager.create(
-            instance._config.bootstrap_nodes,
-            config=instance._config.dht,
+        instance._dht_manager.remove_network(instance._config.dht.network.name)
+        await instance._dht_manager.add_network_async(
+            instance._config.dht.network, instance._config.bootstrap_nodes
         )
         return instance
 
     def __del__(self):
-        self._dht_manager.stop()
+        for manager in list(self._dht_manager._managers.values()):
+            manager.stop()
 
     async def switch_dht_network(
         self,
@@ -86,15 +98,14 @@ class BitBoot:
     ) -> None:
         """Switch the underlying DHT network BitBoot operates on."""
 
-        await self._dht_manager.switch_network(network, bootstrap_nodes)
-        self._config.dht = DHTConfig(
-            network=DHTNetwork(network),
-            backend=self._config.dht.backend,
-            listen=self._config.dht.listen,
-        )
-        self._config.bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(
-            DHTNetwork(network), []
-        )
+        self._dht_manager.remove_network(self._config.dht.network.name)
+        await self._dht_manager.add_network_async(network, bootstrap_nodes)
+        if isinstance(network, str):
+            net = DHT_NETWORK_REGISTRY.get(network)
+        else:
+            net = network
+        self._config.dht = DHTConfig(network=net, listen=self._config.dht.listen)
+        self._config.bootstrap_nodes = bootstrap_nodes or net.bootstrap_hosts
 
     # -----------------------
     # Util
@@ -119,7 +130,9 @@ class BitBoot:
         """
 
         if peer_config is None:
-            listening_host = creator._dht_manager.get_listening_host()
+            listening_host = creator._dht_manager.get_manager(
+                creator._config.dht.network.name
+            ).get_listening_host()
             peer_config = BitBootConfig(
                 bootstrap_nodes=[listening_host],
                 rate_limit_delay=1.0,
@@ -139,31 +152,56 @@ class BitBoot:
         return hashlib.sha1(network_name.encode()).digest()
 
     def num_peers(self) -> Dict[str, int]:
-        return {name: len(peers) for name, peers in self._discovered_peers.items()}
+        return {
+            name: sum(len(p) for p in peers_by_dht.values())
+            for name, peers_by_dht in self._discovered_peers.items()
+        }
 
     # -----------------------
     # Lookup
     # -----------------------
     async def lookup(
-        self, network_names: Union[str, List[str]], num_searches: int = 10, delay: int = 5
+        self,
+        networks: Union[str, Network, List[Union[str, Network]]],
+        num_searches: int = 10,
+        delay: int = 5,
     ):
-        if isinstance(network_names, str):
-            network_names = [network_names]
+        if isinstance(networks, (str, Network)):
+            networks = [networks]
 
         tasks = []
-        for network_name in network_names:
-            tasks.append(self._lookup_single(network_name, num_searches, delay))
+        for net in networks:
+            if isinstance(net, str):
+                network_obj = NETWORK_REGISTRY.get(net) or NETWORK_REGISTRY.create(net)
+            else:
+                network_obj = net
+            for dht_net in network_obj.dht_networks:
+                manager = self._dht_manager.get_manager(dht_net.name)
+                if manager is None:
+                    manager = self._dht_manager.add_network(dht_net)
+                tasks.append(
+                    self._lookup_single(
+                        manager, network_obj.name, dht_net.name, num_searches, delay
+                    )
+                )
 
         await asyncio.gather(*tasks)
 
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to lookup network"))
-    async def _lookup_single(self, network_name: str, num_searches: int, delay: int) -> None:
+    async def _lookup_single(
+        self,
+        manager: DHTManager,
+        network_name: str,
+        dht_network_name: str,
+        num_searches: int,
+        delay: int,
+    ) -> None:
         info_hash = self._generate_info_hash(network_name)
         found_peers = set()
 
         for _ in range(num_searches):
             await asyncio.sleep(delay)
-            results = await self._dht_manager._server.get(info_hash)
+            results = await manager.get_server().get(info_hash)
             if results:
                 for peer in results:
                     if isinstance(peer, tuple):
@@ -175,13 +213,14 @@ class BitBoot:
                         except ValueError:
                             continue
 
-        # Update the discovered peers for this network
-        self._discovered_peers[network_name] = found_peers
+        peers_dict = self._discovered_peers.setdefault(network_name, {})
+        peers_dict[dht_network_name] = found_peers
 
-        # Write discovered peers to a file and print to stdout if enabled
+        union_peers = set().union(*peers_dict.values())
+
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(f"{network_name}_peers.txt", "w") as f:
-            for peer in found_peers:
+            for peer in union_peers:
                 f.write(f"{peer}\n")
                 if self._config.print_discovered_peers:
                     print(f"[{now}] {network_name}: {peer}")
@@ -191,30 +230,40 @@ class BitBoot:
     # -----------------------
 
     async def announce_peer(
-        self, network_names: Union[str, List[str]], peer: KnownHost
+        self,
+        networks: Union[str, Network, List[Union[str, Network]]],
+        peer: KnownHost,
     ):
         """Announce a peer address for one or more network names."""
 
-        if isinstance(network_names, str):
-            network_names = [network_names]
+        if isinstance(networks, (str, Network)):
+            networks = [networks]
 
         tasks = []
-        for network_name in network_names:
-            tasks.append(self._announce_peer_single(network_name, peer))
+        for net in networks:
+            if isinstance(net, str):
+                network_obj = NETWORK_REGISTRY.get(net) or NETWORK_REGISTRY.create(net)
+            else:
+                network_obj = net
+            for dht_net in network_obj.dht_networks:
+                manager = self._dht_manager.get_manager(dht_net.name)
+                if manager is None:
+                    manager = self._dht_manager.add_network(dht_net)
+                tasks.append(
+                    self._announce_peer_single(manager, network_obj.name, peer)
+                )
 
         await asyncio.gather(*tasks)
 
     @retry(wait=wait_fixed(5), stop=stop_after_attempt(3), retry_error_callback=lambda _: logging.error("Failed to announce peer"))
-    async def _announce_peer_single(self, network_name: str, peer: KnownHost) -> None:
+    async def _announce_peer_single(
+        self, manager: DHTManager, network_name: str, peer: KnownHost
+    ) -> None:
         """Announce a single peer address to the DHT."""
 
         info_hash = self._generate_info_hash(network_name)
 
-        # Store the peer as a "host:port" string because the underlying
-        # Kademlia implementation only accepts primitive value types.
-        await self._dht_manager._server.set(
-            info_hash, f"{peer.host}:{peer.port}"
-        )
+        await manager.get_server().set(info_hash, f"{peer.host}:{peer.port}")
 
     # -----------------------
     # Continuous Mode

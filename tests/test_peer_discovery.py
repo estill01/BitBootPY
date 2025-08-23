@@ -18,7 +18,7 @@ def _compat_coroutine(func):
 asyncio.coroutine = _compat_coroutine
 
 from bitbootpy.core.bitbootpy import BitBoot, BitBootConfig
-from bitbootpy.core.known_hosts import KnownHost
+from bitbootpy.core.dht_network import KnownHost
 
 
 class DummyServer:
@@ -47,14 +47,21 @@ async def test_peer_discovery_dummy_network():
     dummy = DummyServer()
     node_a = BitBoot()
     node_b = BitBoot()
-    node_a._dht_manager._server = dummy
-    node_b._dht_manager._server = dummy
+    node_a._dht_manager.get_manager(node_a._config.dht.network.name)._server = dummy
+    node_b._dht_manager.get_manager(node_b._config.dht.network.name)._server = dummy
 
     peer = KnownHost("127.0.0.1", 1234)
     await node_a.announce_peer("test_topic", peer)
     await node_b.lookup("test_topic", num_searches=1, delay=0)
 
-    assert peer.as_tuple() in node_b._discovered_peers["test_topic"]
+    discovered = {
+        p
+        for peers in node_b._discovered_peers["test_topic"].values()
+        for p in peers
+    }
+    assert peer.as_tuple() in discovered
 
-    node_a._dht_manager.stop()
-    node_b._dht_manager.stop()
+    for mgr in node_a._dht_manager._managers.values():
+        mgr.stop()
+    for mgr in node_b._dht_manager._managers.values():
+        mgr.stop()

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from kademlia.network import Server
 from kademlia.routing import KBucket
 import asyncio
 
-from .known_hosts import KNOWN_HOSTS, KnownHost, DHTConfig, DHTBackend, DHTNetwork
+from .dht_network import (
+    KnownHost,
+    DHTConfig,
+    DHTBackend,
+    DHTNetwork,
+    DHT_NETWORK_REGISTRY,
+)
 
 
 class DHTManager:
@@ -25,13 +31,15 @@ class DHTManager:
     ):
         self._config = config or DHTConfig()
 
-        if self._config.backend != DHTBackend.KADEMLIA:
+        if self._config.network.backend != DHTBackend.KADEMLIA:
             # Future backends can be selected here
-            raise ValueError(f"Unsupported DHT backend: {self._config.backend}")
+            raise ValueError(
+                f"Unsupported DHT backend: {self._config.network.backend}"
+            )
 
         self._server = Server()
-        self._bootstrap_nodes: List[KnownHost] = bootstrap_nodes or KNOWN_HOSTS.get(
-            self._config.network, []
+        self._bootstrap_nodes: List[KnownHost] = (
+            bootstrap_nodes or self._config.network.bootstrap_hosts
         )
 
 
@@ -89,13 +97,64 @@ class DHTManager:
         """Switch the underlying DHT network and re-bootstrap the server."""
 
         self.stop()
-        self._config = DHTConfig(
-            network=DHTNetwork(network),
-            backend=self._config.backend,
-            listen=self._config.listen,
-        )
+        if isinstance(network, str):
+            net = DHT_NETWORK_REGISTRY.get(network)
+            if net is None:
+                raise ValueError(f"Unknown DHT network: {network}")
+        else:
+            net = network
+
+        self._config = DHTConfig(network=net, listen=self._config.listen)
         self._server = Server()
-        self._bootstrap_nodes = bootstrap_nodes or KNOWN_HOSTS.get(
-            self._config.network, []
-        )
+        self._bootstrap_nodes = bootstrap_nodes or net.bootstrap_hosts
         await self._bootstrap_dht()
+
+
+class MultiDHTManager:
+    """Manage multiple :class:`DHTManager` instances, one per DHT network."""
+
+    def __init__(self) -> None:
+        self._managers: Dict[str, DHTManager] = {}
+
+    def add_network(
+        self, network: Union[str, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
+    ) -> DHTManager:
+        if isinstance(network, str):
+            net = DHT_NETWORK_REGISTRY.get(network)
+            if net is None:
+                raise ValueError(f"Unknown DHT network: {network}")
+        else:
+            net = network
+
+        manager = DHTManager(
+            bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net)
+        )
+        self._managers[net.name] = manager
+        return manager
+
+    async def add_network_async(
+        self, network: Union[str, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
+    ) -> DHTManager:
+        if isinstance(network, str):
+            net = DHT_NETWORK_REGISTRY.get(network)
+            if net is None:
+                raise ValueError(f"Unknown DHT network: {network}")
+        else:
+            net = network
+
+        manager = await DHTManager.create(
+            bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net)
+        )
+        self._managers[net.name] = manager
+        return manager
+
+    def get_manager(self, name: str) -> Optional[DHTManager]:
+        return self._managers.get(name)
+
+    def remove_network(self, name: str) -> None:
+        manager = self._managers.pop(name, None)
+        if manager:
+            manager.stop()
+
+    def list_networks(self) -> List[DHTNetwork]:
+        return [m._config.network for m in self._managers.values()]

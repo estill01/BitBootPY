@@ -1,10 +1,10 @@
 import pytest
-from bitbootpy.core.known_hosts import (
+from bitbootpy.core.dht_network import (
     add_network,
     remove_network,
     add_known_host,
     remove_known_host,
-    KNOWN_HOSTS,
+    DHT_NETWORK_REGISTRY,
     KnownHost,
 )
 
@@ -12,9 +12,9 @@ from bitbootpy.core.known_hosts import (
 def test_dynamic_known_hosts():
     network = add_network("tempnet")
     host = KnownHost("127.0.0.1", 1234)
-    add_known_host(network, host)
-    assert host in KNOWN_HOSTS[network]
-    remove_known_host(network, host)
-    assert host not in KNOWN_HOSTS[network]
-    remove_network(network)
-    assert network not in KNOWN_HOSTS
+    add_known_host(network.name, host)
+    assert host in DHT_NETWORK_REGISTRY.get(network.name).bootstrap_hosts
+    remove_known_host(network.name, host)
+    assert host not in DHT_NETWORK_REGISTRY.get(network.name).bootstrap_hosts
+    remove_network(network.name)
+    assert DHT_NETWORK_REGISTRY.get(network.name) is None
