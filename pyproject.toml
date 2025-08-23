@@ -15,6 +15,10 @@ tenacity = "^8.2.2"
 typing_extensions = ">=4.7"
 
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4"
+pytest-asyncio = "^0.21"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
