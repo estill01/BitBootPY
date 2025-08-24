@@ -12,7 +12,11 @@ from .dht_network import (
     DHT_NETWORK_REGISTRY,
 )
 from .network_names import NetworkName
-from .backends import BACKEND_REGISTRY, BaseDHTBackend
+from .backends import (
+    BACKEND_REGISTRY,
+    BaseDHTBackend,
+    set_backend_for_network as _set_backend_for_network_mapping,
+)
 
 
 class DHTManager:
@@ -171,3 +175,37 @@ class MultiDHTManager:
 
     def list_networks(self) -> List[DHTNetwork]:
         return [m._config.network for m in self._managers.values()]
+
+    async def set_backend_for_network(
+        self,
+        network: Union[str, NetworkName],
+        backend_key: str,
+        bootstrap_nodes: Optional[List[KnownHost]] = None,
+    ) -> DHTManager:
+        """Repoint a DHT network to a different backend and apply it.
+
+        - Updates the global registry mapping for the network name.
+        - If a manager for this network exists, switches it asynchronously.
+        - Otherwise, creates and bootstraps a new manager for the network.
+        """
+        # Update registry mapping
+        _set_backend_for_network_mapping(network, backend_key)
+
+        # Resolve concrete network config
+        net_key = network.value if isinstance(network, NetworkName) else str(network)
+        net = DHT_NETWORK_REGISTRY.get(net_key)
+        if net is None:
+            raise ValueError(f"Unknown DHT network after mapping: {net_key}")
+
+        existing = self._managers.get(net.name)
+        if existing is not None:
+            await existing.switch_network(net, bootstrap_nodes)
+            return existing
+
+        # Create a new manager if one didn't exist
+        manager = await DHTManager.create(
+            bootstrap_nodes=bootstrap_nodes or net.bootstrap_hosts,
+            config=DHTConfig(network=net),
+        )
+        self._managers[net.name] = manager
+        return manager

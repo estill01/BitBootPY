@@ -138,5 +138,7 @@ class EthereumBackend(BaseDHTBackend):
         return self._host
 
 
-# Register backend and associated network
-register_backend_with_network(NetworkName.ETHEREUM, EthereumBackend)
+# Register backend and associated network with normalized naming
+register_backend_with_network(
+    "ethereum", EthereumBackend, network_name=NetworkName.ETHEREUM
+)

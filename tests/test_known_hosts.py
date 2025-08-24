@@ -24,4 +24,4 @@ def test_dynamic_known_hosts():
 def test_builtin_networks_registered():
     # built-in networks register with canonical names
     assert DHT_NETWORK_REGISTRY.get(NetworkName.BITCOIN) is not None
-    assert NetworkName.BITCOIN in BACKEND_REGISTRY
+    assert "bitcoin" in BACKEND_REGISTRY

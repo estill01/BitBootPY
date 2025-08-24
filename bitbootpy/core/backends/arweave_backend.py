@@ -97,5 +97,7 @@ class ArweaveBackend(BaseDHTBackend):
         return self._host
 
 
-# Register backend and associated network
-register_backend_with_network(NetworkName.ARWEAVE, ArweaveBackend)
+# Register backend and associated network with normalized naming
+register_backend_with_network(
+    "arweave", ArweaveBackend, network_name=NetworkName.ARWEAVE
+)

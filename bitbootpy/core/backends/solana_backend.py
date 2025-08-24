@@ -117,5 +117,7 @@ class SolanaBackend(BaseDHTBackend):
         return self._host
 
 
-# Register backend and associated network
-register_backend_with_network(NetworkName.SOLANA, SolanaBackend)
+# Register backend and associated network with normalized naming
+register_backend_with_network(
+    "solana", SolanaBackend, network_name=NetworkName.SOLANA
+)

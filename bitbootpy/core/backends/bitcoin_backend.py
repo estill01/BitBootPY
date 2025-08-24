@@ -121,7 +121,7 @@ class BitcoinBackend(BaseDHTBackend):
         return self._host
 
 
-# Register backend and associated network
+# Register backend and associated network with normalized naming
 bootstrap_hosts = [
     KnownHost("seed.bitcoin.sipa.be", 8333),
     KnownHost("dnsseed.bluematt.me", 8333),
@@ -129,8 +129,8 @@ bootstrap_hosts = [
     KnownHost("seed.bitcoin.jonasschnelli.ch", 8333),
 ]
 register_backend_with_network(
-    NetworkName.BITCOIN,
+    "bitcoin",
     BitcoinBackend,
+    network_name=NetworkName.BITCOIN,
     bootstrap_hosts=bootstrap_hosts,
 )
-

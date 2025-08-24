@@ -16,7 +16,7 @@ from bitbootpy.core.wallets import (
     get_solana_keypair,
     get_arweave_wallet,
 )
-from bitbootpy.core.backends.ethereum_discv5 import EthereumDiscv5Backend
+from bitbootpy.core.backends.ethereum_backend import EthereumBackend
 from bitbootpy.core.backends.solana_backend import SolanaBackend
 
 
@@ -95,7 +95,12 @@ def test_get_arweave_wallet(monkeypatch):
 def test_ethereum_backend_uses_helper(monkeypatch):
     pk = eth_keys.PrivateKey(os.urandom(32))
     monkeypatch.setenv("BITBOOTPY_ETHEREUM_KEY", pk.to_hex())
-    backend = EthereumDiscv5Backend()
+    # Provide minimal required config for EthereumBackend construction
+    monkeypatch.setenv("BITBOOTPY_ETHEREUM_RPC", "http://localhost:8545")
+    monkeypatch.setenv(
+        "BITBOOTPY_ETHEREUM_CONTRACT", "0x0000000000000000000000000000000000000001"
+    )
+    backend = EthereumBackend()
     assert backend.key == pk
 
 
