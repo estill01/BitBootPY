@@ -10,11 +10,17 @@ protocol.
 
 from typing import Any, Iterable, Tuple
 
+from ..wallets import get_eth_key
 from .base import BaseDHTBackend
 
 
 class EthereumDiscv5Backend(BaseDHTBackend):
     """Non-functional example backend for Ethereum Discovery v5."""
+
+    def __init__(self) -> None:
+        # Load the private key from the environment.  Real implementations would
+        # use this key to identify the node on the Ethereum network.
+        self.key = get_eth_key()
 
     async def listen(self, port: int) -> None:  # pragma: no cover - illustrative
         raise NotImplementedError("Ethereum Discovery v5 backend not implemented")

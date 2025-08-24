@@ -9,11 +9,16 @@ illustrates how a third-party library could be wrapped to conform to the
 
 from typing import Any, Iterable, Tuple
 
+from ..wallets import get_solana_keypair
 from .base import BaseDHTBackend
 
 
 class SolanaBackend(BaseDHTBackend):
     """Non-functional example backend for the Solana network."""
+
+    def __init__(self) -> None:
+        # Load the Solana keypair from the environment to identify the node.
+        self.keypair = get_solana_keypair()
 
     async def listen(self, port: int) -> None:  # pragma: no cover - illustrative
         raise NotImplementedError("Solana backend not implemented")
