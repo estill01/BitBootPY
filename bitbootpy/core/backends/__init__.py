@@ -32,3 +32,10 @@ try:  # pragma: no cover - illustrative only
     register_backend("solana", SolanaBackend)
 except Exception:  # pragma: no cover - illustrative only
     pass
+
+try:  # pragma: no cover - illustrative only
+    from .bitcoin_backend import BitcoinBackend
+
+    register_backend("bitcoin", BitcoinBackend)
+except Exception:  # pragma: no cover - illustrative only
+    pass
