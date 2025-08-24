@@ -1,44 +1,74 @@
-"""Backend registry and built-in backend registrations."""
+"""Backend registry and helper for registering networks alongside backends."""
 
 from __future__ import annotations
 
-from typing import Callable, Dict
+from typing import Callable, Dict, List, Optional
 
+from ..dht_network import DHTNetwork, DHT_NETWORK_REGISTRY, KnownHost
 from .base import BaseDHTBackend
+
+# ---------------------------------------------------------------------------
+# Backend registry
+# ---------------------------------------------------------------------------
 
 BACKEND_REGISTRY: Dict[str, Callable[[], BaseDHTBackend]] = {}
 
 
-def register_backend(name: str, factory: Callable[[], BaseDHTBackend]) -> None:
-    """Register a backend factory under ``name``."""
-    BACKEND_REGISTRY[name] = factory
+def register_backend_with_network(
+    backend_name: str,
+    backend_factory: Callable[[], BaseDHTBackend],
+    network_name: Optional[str] = None,
+    bootstrap_hosts: Optional[List[KnownHost]] = None,
+) -> None:
+    """Register ``backend_factory`` and an optional associated network.
+
+    Parameters
+    ----------
+    backend_name:
+        Name under which the backend factory will be stored.
+    backend_factory:
+        Callable returning an instance of :class:`BaseDHTBackend`.
+    network_name:
+        Optional name of a :class:`~bitbootpy.core.dht_network.DHTNetwork` to
+        register simultaneously.  If omitted, ``backend_name`` is used.
+    bootstrap_hosts:
+        Optional list of :class:`KnownHost` entries describing bootstrap nodes
+        for the network.
+    """
+
+    BACKEND_REGISTRY[backend_name] = backend_factory
+
+    DHT_NETWORK_REGISTRY.add(
+        DHTNetwork(
+            network_name or backend_name,
+            backend=backend_name,
+            bootstrap_hosts=bootstrap_hosts or [],
+        )
+    )
 
 
-# Register built-in backends
-from .kademlia import KademliaBackend
-register_backend("kademlia", KademliaBackend)
+# ---------------------------------------------------------------------------
+# Import built-in backends so they register themselves
+# ---------------------------------------------------------------------------
 
-from .arweave import ArweaveBackend
-register_backend("arweave", ArweaveBackend)
+from . import kademlia  # noqa: F401
 
-# Optional example backends
 try:  # pragma: no cover - illustrative only
-    from .ethereum_backend import EthereumBackend
-
-    register_backend("ethereum", EthereumBackend)
+    from . import arweave  # noqa: F401
 except Exception:  # pragma: no cover - illustrative only
     pass
 
 try:  # pragma: no cover - illustrative only
-    from .solana_backend import SolanaBackend
-
-    register_backend("solana", SolanaBackend)
+    from . import ethereum_backend  # noqa: F401
 except Exception:  # pragma: no cover - illustrative only
     pass
 
 try:  # pragma: no cover - illustrative only
-    from .bitcoin_backend import BitcoinBackend
+    from . import solana_backend  # noqa: F401
+except Exception:  # pragma: no cover - illustrative only
+    pass
 
-    register_backend("bitcoin", BitcoinBackend)
+try:  # pragma: no cover - illustrative only
+    from . import bitcoin_backend  # noqa: F401
 except Exception:  # pragma: no cover - illustrative only
     pass

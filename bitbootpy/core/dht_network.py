@@ -74,11 +74,8 @@ class DHTNetworkRegistry:
 # Global registry instance used throughout the project
 DHT_NETWORK_REGISTRY = DHTNetworkRegistry()
 
-
-# Load all built-in networks which register themselves on import
-from .dhtnetworks import register_all as _register_dht_networks
-
-_register_dht_networks()
+# Import built-in backends so they can register their networks
+from . import backends as _backends  # noqa: F401
 
 
 # ---------------------------------------------------------------------------

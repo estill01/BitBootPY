@@ -21,6 +21,7 @@ from bitcoin.rpc import RawProxy
 
 from ..wallets import get_btc_key, get_btc_rpc_url
 from .base import BaseDHTBackend
+from . import register_backend_with_network
 
 
 class BitcoinBackend(BaseDHTBackend):
@@ -116,4 +117,8 @@ class BitcoinBackend(BaseDHTBackend):
 
     def get_listening_host(self) -> Tuple[str, int]:
         return self._host
+
+
+# Register backend and associated network
+register_backend_with_network("bitcoin", BitcoinBackend, network_name="btc")
 
