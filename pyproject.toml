@@ -15,6 +15,9 @@ tenacity = "^8.2.2"
 typing_extensions = ">=4.7"
 python-bitcoinlib = "^0.12.2"
 arweave-python-client = "^1.0.19"
+solana = "^0.30.2"
+web3 = "^7.0"
+ddht = "*"
 
 
 [tool.poetry.group.dev.dependencies]
