@@ -139,4 +139,4 @@ class EthereumBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network(NetworkName.ETHEREUM, EthereumBackend, network_name=NetworkName.ETHEREUM)
+register_backend_with_network(NetworkName.ETHEREUM, EthereumBackend)
