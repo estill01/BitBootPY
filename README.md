@@ -82,3 +82,46 @@ Most built-in network definitions (e.g. Ethereum or Solana) do not ship with
 bootstrap host lists or working backends.  They act as placeholders so that
 projects can supply the necessary dependencies and configuration at runtime.
 
+## Blockchain backends
+
+BitBootPy includes optional backends that persist DHT records directly on
+popular blockchains.  Using these backends requires additional dependencies and
+environment variables and will incur on-chain transaction fees whenever a value
+is stored.  For development, always prefer running against testnets or local
+nodes to avoid spending real funds and publishing data permanently.
+
+### Bitcoin
+
+- **Environment**: ``BITBOOTPY_BTC_KEY`` (WIF private key),
+  ``BITBOOTPY_BTC_RPC_URL`` (JSON-RPC endpoint)
+- **Dependency**: ``python-bitcoinlib``
+- **Fees**: ``set`` writes an ``OP_RETURN`` transaction and pays the Bitcoin
+  network fee.  Data is permanent and publicly visible.
+
+### Ethereum
+
+- **Environment**: ``BITBOOTPY_ETH_KEY`` (hex private key), ``BITBOOTPY_ETH_RPC``
+  (RPC URL), ``BITBOOTPY_ETH_CONTRACT`` (storage contract address)
+- **Dependencies**: ``web3`` and optional ``ddht`` for Discovery v5
+- **Fees**: ``set`` submits a transaction to the contract and consumes gas.
+
+### Solana
+
+- **Environment**: ``BITBOOTPY_SOLANA_KEYPAIR`` (JSON or base58 keypair),
+  optional ``BITBOOTPY_SOLANA_RPC`` (RPC URL)
+- **Dependency**: ``solana``
+- **Fees**: ``set`` creates or updates an account and pays lamports for rent
+  and transaction fees.
+
+### Arweave
+
+- **Environment**: ``BITBOOTPY_ARWEAVE_WALLET`` (JWK wallet JSON), optional
+  ``BITBOOTPY_ARWEAVE_GATEWAY`` (gateway URL)
+- **Dependency**: ``arweave-python-client``
+- **Fees**: ``set`` publishes a transaction requiring AR tokens.
+
+**Warning**: Interacting with mainnet blockchains costs real cryptocurrency and
+cannot be undone.  Use test networks such as Bitcoin ``regtest``/``testnet``,
+Ethereum ``Sepolia``/``Goerli``, Solana ``devnet``, or the Arweave testnet
+while developing.
+

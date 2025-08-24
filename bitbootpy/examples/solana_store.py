@@ -1,17 +1,19 @@
-"""Example using the Solana backend for simple key/value storage."""
+"""Example using the Solana backend for simple key/value storage.
+
+Requires ``BITBOOTPY_SOLANA_KEYPAIR`` and optionally
+``BITBOOTPY_SOLANA_RPC`` environment variables.
+"""
 
 import asyncio
 
-from bitbootpy.core.dht_manager import DHTManager
-from bitbootpy.core.dht_network import DHT_NETWORK_REGISTRY, DHTConfig
+from bitbootpy.core.backends.solana_backend import SolanaBackend
 
 
 async def main() -> None:
-    net = DHT_NETWORK_REGISTRY.get("solana")
-    manager = await DHTManager.create(config=DHTConfig(network=net))
-    await manager.set(b"hello", b"world")
-    print(await manager.get(b"hello"))
-    manager.stop()
+    backend = SolanaBackend()
+    await backend.set(b"hello", b"world")
+    print(await backend.get(b"hello"))
+    backend.stop()
 
 
 if __name__ == "__main__":

@@ -39,3 +39,10 @@ try:  # pragma: no cover - illustrative only
     register_backend("bitcoin", BitcoinBackend)
 except Exception:  # pragma: no cover - illustrative only
     pass
+
+try:  # pragma: no cover - illustrative only
+    from .arweave_backend import ArweaveBackend
+
+    register_backend("arweave", ArweaveBackend)
+except Exception:  # pragma: no cover - illustrative only
+    pass
