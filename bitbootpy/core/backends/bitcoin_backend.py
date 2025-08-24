@@ -19,7 +19,8 @@ from typing import Any, Iterable, Tuple
 
 from bitcoin.rpc import RawProxy
 
-from ..wallets import get_btc_key, get_btc_rpc_url
+from ..wallets import get_bitcoin_key, get_bitcoin_rpc_url
+from ..network_names import NetworkName
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -30,8 +31,8 @@ class BitcoinBackend(BaseDHTBackend):
     PREFIX = b"BitBootPy:"
 
     def __init__(self, rpc_url: str | None = None) -> None:
-        self.key = get_btc_key()
-        self.rpc_url = rpc_url or get_btc_rpc_url()
+        self.key = get_bitcoin_key()
+        self.rpc_url = rpc_url or get_bitcoin_rpc_url()
         self.proxy = RawProxy(service_url=self.rpc_url)
         self._host: Tuple[str, int] = ("0.0.0.0", 0)
         self._nodes: list[Tuple[str, int]] = []
@@ -89,7 +90,7 @@ class BitcoinBackend(BaseDHTBackend):
         """Encode ``key`` and ``value`` in an ``OP_RETURN`` output.
 
         The transaction is funded by the connected node and signed locally with
-        the private key supplied by :func:`get_btc_key`.
+        the private key supplied by :func:`get_bitcoin_key`.
         """
 
         if isinstance(value, bytes):
@@ -120,5 +121,5 @@ class BitcoinBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network("bitcoin", BitcoinBackend, network_name="btc")
+register_backend_with_network(NetworkName.BITCOIN, BitcoinBackend, network_name=NetworkName.BITCOIN)
 

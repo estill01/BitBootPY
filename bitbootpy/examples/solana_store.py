@@ -4,10 +4,11 @@ import asyncio
 
 from bitbootpy.core.dht_manager import DHTManager
 from bitbootpy.core.dht_network import DHT_NETWORK_REGISTRY, DHTConfig
+from bitbootpy.core.network_names import NetworkName
 
 
 async def main() -> None:
-    net = DHT_NETWORK_REGISTRY.get("solana")
+    net = DHT_NETWORK_REGISTRY.get(NetworkName.SOLANA)
     manager = await DHTManager.create(config=DHTConfig(network=net))
     await manager.set(b"hello", b"world")
     print(await manager.get(b"hello"))

@@ -19,6 +19,7 @@ from solders.pubkey import Pubkey
 from solders import system_program as sp
 
 from ..wallets import get_solana_keypair
+from ..network_names import NetworkName
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -117,4 +118,4 @@ class SolanaBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network("solana", SolanaBackend)
+register_backend_with_network(NetworkName.SOLANA, SolanaBackend)

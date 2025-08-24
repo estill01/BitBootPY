@@ -8,7 +8,9 @@ each network carries its bootstrap hosts and backend information.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
+
+from .network_names import NetworkName
 
 
 @dataclass(frozen=True)
@@ -41,14 +43,16 @@ class DHTNetworkRegistry:
     # CRUD operations
     # ------------------------------------------------------------------
     def add(self, network: DHTNetwork) -> DHTNetwork:
-        self._networks[network.name] = network
+        self._networks[str(network.name)] = network
         return network
 
-    def remove(self, name: str) -> None:
-        self._networks.pop(name, None)
+    def remove(self, name: Union[str, NetworkName]) -> None:
+        key = name.value if isinstance(name, NetworkName) else name
+        self._networks.pop(key, None)
 
-    def get(self, name: str) -> Optional[DHTNetwork]:
-        return self._networks.get(name)
+    def get(self, name: Union[str, NetworkName]) -> Optional[DHTNetwork]:
+        key = name.value if isinstance(name, NetworkName) else name
+        return self._networks.get(key)
 
     def list(self) -> List[DHTNetwork]:
         return list(self._networks.values())
@@ -56,13 +60,15 @@ class DHTNetworkRegistry:
     # ------------------------------------------------------------------
     # Convenience helpers for manipulating bootstrap hosts
     # ------------------------------------------------------------------
-    def add_known_host(self, name: str, host: KnownHost) -> DHTNetwork:
-        network = self._networks.setdefault(name, DHTNetwork(name))
+    def add_known_host(self, name: Union[str, NetworkName], host: KnownHost) -> DHTNetwork:
+        key = name.value if isinstance(name, NetworkName) else name
+        network = self._networks.setdefault(key, DHTNetwork(key))
         network.bootstrap_hosts.append(host)
         return network
 
-    def remove_known_host(self, name: str, host: KnownHost) -> None:
-        network = self._networks.get(name)
+    def remove_known_host(self, name: Union[str, NetworkName], host: KnownHost) -> None:
+        key = name.value if isinstance(name, NetworkName) else name
+        network = self._networks.get(key)
         if not network:
             return
         try:
@@ -85,20 +91,21 @@ from . import backends as _backends  # noqa: F401
 # ---------------------------------------------------------------------------
 
 
-def add_network(name: str, hosts: Optional[List[KnownHost]] = None) -> DHTNetwork:
-    network = DHTNetwork(name, bootstrap_hosts=hosts or [])
+def add_network(name: Union[str, NetworkName], hosts: Optional[List[KnownHost]] = None) -> DHTNetwork:
+    key = name.value if isinstance(name, NetworkName) else name
+    network = DHTNetwork(key, bootstrap_hosts=hosts or [])
     return DHT_NETWORK_REGISTRY.add(network)
 
 
-def remove_network(name: str) -> None:
+def remove_network(name: Union[str, NetworkName]) -> None:
     DHT_NETWORK_REGISTRY.remove(name)
 
 
-def add_known_host(network: str, host: KnownHost) -> None:
+def add_known_host(network: Union[str, NetworkName], host: KnownHost) -> None:
     DHT_NETWORK_REGISTRY.add_known_host(network, host)
 
 
-def remove_known_host(network: str, host: KnownHost) -> None:
+def remove_known_host(network: Union[str, NetworkName], host: KnownHost) -> None:
     DHT_NETWORK_REGISTRY.remove_known_host(network, host)
 
 
@@ -107,7 +114,7 @@ class DHTConfig:
     """Configuration for running a local DHT node."""
 
     network: DHTNetwork = field(
-        default_factory=lambda: DHT_NETWORK_REGISTRY.get("bit_torrent")
+        default_factory=lambda: DHT_NETWORK_REGISTRY.get(NetworkName.BIT_TORRENT)
     )
     listen: KnownHost = KnownHost("0.0.0.0", 5678)
 

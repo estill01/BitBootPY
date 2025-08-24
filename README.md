@@ -65,6 +65,11 @@ when imported. The registry is populated automatically during startup, but you
 can add your own networks by creating a similar module and ensuring it is
 imported.
 
+All networks use canonical names enumerated in
+``bitbootpy.core.network_names.NetworkName`` (e.g. ``NetworkName.BITCOIN``).
+The enum inherits from :class:`str`, so code may use either the enum value or
+the underlying string interchangeably.
+
 For local testing the package also provides a ``local`` network that has no
 bootstrap hosts. Tests and examples can use this lightweight network without
 reaching out to public DHT nodes.

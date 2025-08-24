@@ -10,9 +10,9 @@ from arweave import Wallet
 from Crypto.PublicKey import RSA
 
 from bitbootpy.core.wallets import (
-    get_btc_key,
-    get_btc_rpc_url,
-    get_eth_key,
+    get_bitcoin_key,
+    get_bitcoin_rpc_url,
+    get_ethereum_key,
     get_solana_keypair,
     get_arweave_wallet,
 )
@@ -21,42 +21,42 @@ from bitbootpy.core.backends.solana_backend import SolanaBackend
 
 
 def test_missing_env(monkeypatch):
-    monkeypatch.delenv("BITBOOTPY_BTC_KEY", raising=False)
-    monkeypatch.delenv("BITBOOTPY_BTC_RPC_URL", raising=False)
-    monkeypatch.delenv("BITBOOTPY_ETH_KEY", raising=False)
+    monkeypatch.delenv("BITBOOTPY_BITCOIN_KEY", raising=False)
+    monkeypatch.delenv("BITBOOTPY_BITCOIN_RPC_URL", raising=False)
+    monkeypatch.delenv("BITBOOTPY_ETHEREUM_KEY", raising=False)
     monkeypatch.delenv("BITBOOTPY_SOLANA_KEYPAIR", raising=False)
     monkeypatch.delenv("BITBOOTPY_ARWEAVE_WALLET", raising=False)
 
     with pytest.raises(RuntimeError):
-        get_btc_key()
+        get_bitcoin_key()
     with pytest.raises(RuntimeError):
-        get_btc_rpc_url()
+        get_bitcoin_rpc_url()
     with pytest.raises(RuntimeError):
-        get_eth_key()
+        get_ethereum_key()
     with pytest.raises(RuntimeError):
         get_solana_keypair()
     with pytest.raises(RuntimeError):
         get_arweave_wallet()
 
 
-def test_get_btc_key(monkeypatch):
+def test_get_bitcoin_key(monkeypatch):
     k = BTCKey()
-    monkeypatch.setenv("BITBOOTPY_BTC_KEY", k.wif())
-    loaded = get_btc_key()
+    monkeypatch.setenv("BITBOOTPY_BITCOIN_KEY", k.wif())
+    loaded = get_bitcoin_key()
     assert isinstance(loaded, BTCKey)
     assert loaded.wif() == k.wif()
 
 
-def test_get_btc_rpc_url(monkeypatch):
+def test_get_bitcoin_rpc_url(monkeypatch):
     url = "http://localhost:8332"
-    monkeypatch.setenv("BITBOOTPY_BTC_RPC_URL", url)
-    assert get_btc_rpc_url() == url
+    monkeypatch.setenv("BITBOOTPY_BITCOIN_RPC_URL", url)
+    assert get_bitcoin_rpc_url() == url
 
 
-def test_get_eth_key(monkeypatch):
+def test_get_ethereum_key(monkeypatch):
     pk = eth_keys.PrivateKey(os.urandom(32))
-    monkeypatch.setenv("BITBOOTPY_ETH_KEY", pk.to_hex())
-    loaded = get_eth_key()
+    monkeypatch.setenv("BITBOOTPY_ETHEREUM_KEY", pk.to_hex())
+    loaded = get_ethereum_key()
     assert isinstance(loaded, eth_keys.PrivateKey)
     assert loaded == pk
 
@@ -94,7 +94,7 @@ def test_get_arweave_wallet(monkeypatch):
 
 def test_ethereum_backend_uses_helper(monkeypatch):
     pk = eth_keys.PrivateKey(os.urandom(32))
-    monkeypatch.setenv("BITBOOTPY_ETH_KEY", pk.to_hex())
+    monkeypatch.setenv("BITBOOTPY_ETHEREUM_KEY", pk.to_hex())
     backend = EthereumDiscv5Backend()
     assert backend.key == pk
 
