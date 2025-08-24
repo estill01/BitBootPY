@@ -45,7 +45,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-For more examples and details on how to use BitBootPy, see the `bitbootpy/examples` directory.
+For more examples and details on how to use BitBootPy, see the `examples` directory.
 
 ## Command-line interface
 Run the CLI to announce or discover peers without writing code:
@@ -56,4 +56,36 @@ python -m bitbootpy.applications.cli --lookup mynet
 ```
 
 Use ``--continuous mynet`` to poll for peers continuously or ``--help`` for all options.
+
+## Built-in DHT networks and extensibility
+
+BitBootPy ships with a small set of built-in DHT network definitions located in
+`bitbootpy/core/dhtnetworks/`. Each module registers a ``DHTNetwork`` instance
+when imported. The registry is populated automatically during startup, but you
+can add your own networks by creating a similar module and ensuring it is
+imported.
+
+For local testing the package also provides a ``local`` network that has no
+bootstrap hosts. Tests and examples can use this lightweight network without
+reaching out to public DHT nodes.
+
+### Using custom DHT backends
+
+BitBootPy supports pluggable DHT backends.  The default implementation uses the
+``kademlia`` library but alternative backends can be registered by inserting a
+factory into :data:`bitbootpy.core.backends.BACKEND_REGISTRY`.  Each
+``DHTNetwork`` specifies the backend it expects via the ``backend`` field.  See
+``bitbootpy/examples/custom_backend.py`` for a minimal in-memory backend
+demonstrating the registration process.
+
+Most built-in network definitions (e.g. Ethereum or Solana) do not ship with
+bootstrap host lists or working backends.  They act as placeholders so that
+projects can supply the necessary dependencies and configuration at runtime.
+
+BitBootPy now includes lightweight peer-discovery backends for several public
+networks—Bitcoin, Ethereum, Solana, and Arweave—implemented on top of public
+HTTP seed lists.  These backends only expose peer discovery and intentionally
+omit any ability to store or retrieve application data from those networks.
+Example scripts demonstrating their usage are available in the ``examples/``
+directory.
 
