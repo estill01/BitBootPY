@@ -14,6 +14,7 @@ twisted = "^22.10.0"
 tenacity = "^8.2.2"
 typing_extensions = ">=4.7"
 python-bitcoinlib = "^0.12.2"
+arweave-python-client = "^1.0.19"
 
 
 [tool.poetry.group.dev.dependencies]
