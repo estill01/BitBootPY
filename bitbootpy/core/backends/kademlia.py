@@ -6,6 +6,7 @@ from typing import Any, Iterable, Tuple
 from kademlia.network import Server
 
 from ..dht_network import KnownHost
+from ..network_names import NetworkName
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -43,7 +44,7 @@ class KademliaBackend(BaseDHTBackend):
 register_backend_with_network(
     "kademlia",
     KademliaBackend,
-    network_name="bit_torrent",
+    network_name=NetworkName.BIT_TORRENT,
     bootstrap_hosts=[
         KnownHost("dht.transmissionbt.com", 6881),
         KnownHost("dht.u-phoria.org", 6881),
@@ -58,4 +59,4 @@ register_backend_with_network(
     ],
 )
 
-register_backend_with_network("kademlia", KademliaBackend, network_name="local")
+register_backend_with_network("kademlia", KademliaBackend, network_name=NetworkName.LOCAL)

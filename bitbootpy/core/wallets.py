@@ -13,25 +13,25 @@ from arweave import Wallet
 
 def _require_env(var: str) -> str:
     value = os.getenv(var)
-    if not value:
-        raise RuntimeError(f"{var} environment variable is not set")
-    return value
+    if value:
+        return value
+    raise RuntimeError(f"{var} environment variable is not set")
 
 
-def get_btc_key() -> BTCKey:
-    """Return a Bitcoin ``Key`` from ``BITBOOTPY_BTC_KEY``."""
-    key_str = _require_env("BITBOOTPY_BTC_KEY")
+def get_bitcoin_key() -> BTCKey:
+    """Return a Bitcoin ``Key`` from ``BITBOOTPY_BITCOIN_KEY``."""
+    key_str = _require_env("BITBOOTPY_BITCOIN_KEY")
     return BTCKey(key_str)
 
 
-def get_btc_rpc_url() -> str:
-    """Return the Bitcoin RPC URL from ``BITBOOTPY_BTC_RPC_URL``."""
-    return _require_env("BITBOOTPY_BTC_RPC_URL")
+def get_bitcoin_rpc_url() -> str:
+    """Return the Bitcoin RPC URL from ``BITBOOTPY_BITCOIN_RPC_URL``."""
+    return _require_env("BITBOOTPY_BITCOIN_RPC_URL")
 
 
-def get_eth_key() -> eth_keys.PrivateKey:
-    """Return an Ethereum ``PrivateKey`` from ``BITBOOTPY_ETH_KEY``."""
-    key_str = _require_env("BITBOOTPY_ETH_KEY")
+def get_ethereum_key() -> eth_keys.PrivateKey:
+    """Return an Ethereum ``PrivateKey`` from ``BITBOOTPY_ETHEREUM_KEY``."""
+    key_str = _require_env("BITBOOTPY_ETHEREUM_KEY")
     if key_str.startswith("0x") or key_str.startswith("0X"):
         key_str = key_str[2:]
     key_bytes = bytes.fromhex(key_str)

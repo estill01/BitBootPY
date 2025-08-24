@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .dht_network import DHTNetwork, DHT_NETWORK_REGISTRY
+from .network_names import NetworkName
 
 
 @dataclass
@@ -42,7 +43,7 @@ class NetworkRegistry:
     def create(
         self, name: str, dht_networks: Optional[List[DHTNetwork]] = None
     ) -> Network:
-        dht_networks = dht_networks or [DHT_NETWORK_REGISTRY.get("bit_torrent")]
+        dht_networks = dht_networks or [DHT_NETWORK_REGISTRY.get(NetworkName.BIT_TORRENT)]
         network = Network(name, dht_networks)
         return self.add(network)
 

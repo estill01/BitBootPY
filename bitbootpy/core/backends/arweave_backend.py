@@ -10,6 +10,7 @@ import requests
 from arweave import Transaction
 
 from ..wallets import get_arweave_wallet
+from ..network_names import NetworkName
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -97,4 +98,4 @@ class ArweaveBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network("arweave", ArweaveBackend)
+register_backend_with_network(NetworkName.ARWEAVE, ArweaveBackend)

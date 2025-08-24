@@ -11,7 +11,8 @@ try:  # discovery v5 is optional
 except Exception:  # pragma: no cover - optional
     DiscoveryService = None  # type: ignore
 
-from ..wallets import get_eth_key
+from ..wallets import get_ethereum_key
+from ..network_names import NetworkName
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -51,14 +52,16 @@ class EthereumBackend(BaseDHTBackend):
     def __init__(
         self, rpc_url: str | None = None, contract_address: str | None = None
     ) -> None:
-        self.key = get_eth_key()
-        self.rpc_url = rpc_url or os.getenv("BITBOOTPY_ETH_RPC")
+        self.key = get_ethereum_key()
+        self.rpc_url = rpc_url or os.getenv("BITBOOTPY_ETHEREUM_RPC")
         if not self.rpc_url:
-            raise RuntimeError("BITBOOTPY_ETH_RPC environment variable is not set")
+            raise RuntimeError("BITBOOTPY_ETHEREUM_RPC environment variable is not set")
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
-        address = contract_address or os.getenv("BITBOOTPY_ETH_CONTRACT")
+        address = contract_address or os.getenv("BITBOOTPY_ETHEREUM_CONTRACT")
         if not address:
-            raise RuntimeError("BITBOOTPY_ETH_CONTRACT environment variable is not set")
+            raise RuntimeError(
+                "BITBOOTPY_ETHEREUM_CONTRACT environment variable is not set"
+            )
         self.contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(address), abi=self.ABI
         )
@@ -136,4 +139,4 @@ class EthereumBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network("ethereum", EthereumBackend, network_name="eth")
+register_backend_with_network(NetworkName.ETHEREUM, EthereumBackend, network_name=NetworkName.ETHEREUM)

@@ -11,6 +11,7 @@ from .dht_network import (
     DHTNetwork,
     DHT_NETWORK_REGISTRY,
 )
+from .network_names import NetworkName
 from .backends import BACKEND_REGISTRY, BaseDHTBackend
 
 
@@ -100,14 +101,14 @@ class DHTManager:
 
     async def switch_network(
         self,
-        network: Union[str, DHTNetwork],
+        network: Union[str, NetworkName, DHTNetwork],
         bootstrap_nodes: Optional[List[KnownHost]] = None,
     ) -> None:
         """Switch the underlying DHT network and re-bootstrap the server."""
 
         self.stop()
-        if isinstance(network, str):
-            net = DHT_NETWORK_REGISTRY.get(network)
+        if isinstance(network, (str, NetworkName)):
+            net = DHT_NETWORK_REGISTRY.get(str(network))
             if net is None:
                 raise ValueError(f"Unknown DHT network: {network}")
         else:
@@ -129,10 +130,10 @@ class MultiDHTManager:
         self._managers: Dict[str, DHTManager] = {}
 
     def add_network(
-        self, network: Union[str, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
+        self, network: Union[str, NetworkName, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
     ) -> DHTManager:
-        if isinstance(network, str):
-            net = DHT_NETWORK_REGISTRY.get(network)
+        if isinstance(network, (str, NetworkName)):
+            net = DHT_NETWORK_REGISTRY.get(str(network))
             if net is None:
                 raise ValueError(f"Unknown DHT network: {network}")
         else:
@@ -145,10 +146,10 @@ class MultiDHTManager:
         return manager
 
     async def add_network_async(
-        self, network: Union[str, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
+        self, network: Union[str, NetworkName, DHTNetwork], bootstrap_nodes: Optional[List[KnownHost]] = None
     ) -> DHTManager:
-        if isinstance(network, str):
-            net = DHT_NETWORK_REGISTRY.get(network)
+        if isinstance(network, (str, NetworkName)):
+            net = DHT_NETWORK_REGISTRY.get(str(network))
             if net is None:
                 raise ValueError(f"Unknown DHT network: {network}")
         else:

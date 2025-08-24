@@ -2,6 +2,8 @@ import asyncio
 import functools
 import pytest
 
+from bitbootpy.core.network_names import NetworkName
+
 # Compatibility shim for libraries expecting ``asyncio.coroutine``
 
 def _compat_coroutine(func):
@@ -53,7 +55,7 @@ class DummyBackend:
 @pytest.mark.asyncio
 async def test_peer_discovery_dummy_network():
     dummy = DummyBackend()
-    local_net = DHT_NETWORK_REGISTRY.get("local")
+    local_net = DHT_NETWORK_REGISTRY.get(NetworkName.LOCAL)
     test_network = NETWORK_REGISTRY.create("test_topic", [local_net])
     config_a = BitBootConfig(dht=DHTConfig(network=local_net))
     config_b = BitBootConfig(dht=DHTConfig(network=local_net))
