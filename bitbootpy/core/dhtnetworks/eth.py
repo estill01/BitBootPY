@@ -1,10 +1,10 @@
 """Definition for the Ethereum DHT network.
 
-No bootstrap hosts are provided and the network requires the optional
-``eth-discv5`` backend.  Users must supply their own list of Discovery v5
-nodes for bootstrapping.
+The network stores records in a smart contract and can optionally leverage
+Ethereum's Discovery v5 protocol for peer management.  Users must supply their
+own list of bootstrap nodes when using discovery.
 """
 
 from ..dht_network import DHTNetwork, DHT_NETWORK_REGISTRY
 
-DHT_NETWORK_REGISTRY.add(DHTNetwork("eth", backend="eth-discv5"))
+DHT_NETWORK_REGISTRY.add(DHTNetwork("eth", backend="ethereum"))

@@ -1,17 +1,17 @@
-"""Basic example demonstrating announcing and looking up peers."""
+"""Basic example showing how to store and retrieve a value."""
 
 import asyncio
 
-from bitbootpy import BitBoot, BitBootConfig, KnownHost
+from bitbootpy import BitBoot, BitBootConfig
 
 
 async def main() -> None:
     bitboot = await BitBoot.create(BitBootConfig())
-    await bitboot.announce_peer("example_network", KnownHost("127.0.0.1", 6881))
-    await bitboot.lookup("example_network")
+    manager = bitboot._dht_manager.get_manager(bitboot._config.dht.network.name)
+    await manager.set(b"example-key", b"example-value")
+    value = await manager.get(b"example-key")
+    print("Retrieved:", value)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-

@@ -20,9 +20,9 @@ register_backend("kademlia", KademliaBackend)
 
 # Optional example backends
 try:  # pragma: no cover - illustrative only
-    from .ethereum_discv5 import EthereumDiscv5Backend
+    from .ethereum_backend import EthereumBackend
 
-    register_backend("eth-discv5", EthereumDiscv5Backend)
+    register_backend("ethereum", EthereumBackend)
 except Exception:  # pragma: no cover - illustrative only
     pass
 
