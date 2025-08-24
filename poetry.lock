@@ -253,6 +253,18 @@ docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
 testing = ["coverage (>=6.2)", "flaky (>=3.5.0)", "hypothesis (>=5.7.1)", "mypy (>=0.931)", "pytest-trio (>=0.7.0)"]
 
 [[package]]
+name = "python-bitcoinlib"
+version = "0.12.2"
+description = "The Swiss Army Knife of the Bitcoin protocol."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "python-bitcoinlib-0.12.2.tar.gz", hash = "sha256:c65ab61427c77c38d397bfc431f71d86fd355b453a536496ec3fcb41bd10087d"},
+    {file = "python_bitcoinlib-0.12.2-py3-none-any.whl", hash = "sha256:2f29a9f475f21c12169b3a6cc8820f34f11362d7ff1200a5703dce3e4e903a44"},
+]
+
+[[package]]
 name = "rpcudp"
 version = "4.0.2"
 description = "Asynchronous RPC via UDP"
@@ -506,4 +518,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "7af75b22ebb3941e6e479c5019418401d4afe5eac2be850157a2b7c683e5f4b3"
+content-hash = "8caf456394d11afbf69804e8046439eb04088604c235b4f6b846025830200c94"

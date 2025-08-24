@@ -11,6 +11,7 @@ from Crypto.PublicKey import RSA
 
 from bitbootpy.core.wallets import (
     get_btc_key,
+    get_btc_rpc_url,
     get_eth_key,
     get_solana_keypair,
     get_arweave_wallet,
@@ -21,12 +22,15 @@ from bitbootpy.core.backends.solana_backend import SolanaBackend
 
 def test_missing_env(monkeypatch):
     monkeypatch.delenv("BITBOOTPY_BTC_KEY", raising=False)
+    monkeypatch.delenv("BITBOOTPY_BTC_RPC_URL", raising=False)
     monkeypatch.delenv("BITBOOTPY_ETH_KEY", raising=False)
     monkeypatch.delenv("BITBOOTPY_SOLANA_KEYPAIR", raising=False)
     monkeypatch.delenv("BITBOOTPY_ARWEAVE_WALLET", raising=False)
 
     with pytest.raises(RuntimeError):
         get_btc_key()
+    with pytest.raises(RuntimeError):
+        get_btc_rpc_url()
     with pytest.raises(RuntimeError):
         get_eth_key()
     with pytest.raises(RuntimeError):
@@ -41,6 +45,12 @@ def test_get_btc_key(monkeypatch):
     loaded = get_btc_key()
     assert isinstance(loaded, BTCKey)
     assert loaded.wif() == k.wif()
+
+
+def test_get_btc_rpc_url(monkeypatch):
+    url = "http://localhost:8332"
+    monkeypatch.setenv("BITBOOTPY_BTC_RPC_URL", url)
+    assert get_btc_rpc_url() == url
 
 
 def test_get_eth_key(monkeypatch):

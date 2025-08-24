@@ -24,6 +24,11 @@ def get_btc_key() -> BTCKey:
     return BTCKey(key_str)
 
 
+def get_btc_rpc_url() -> str:
+    """Return the Bitcoin RPC URL from ``BITBOOTPY_BTC_RPC_URL``."""
+    return _require_env("BITBOOTPY_BTC_RPC_URL")
+
+
 def get_eth_key() -> eth_keys.PrivateKey:
     """Return an Ethereum ``PrivateKey`` from ``BITBOOTPY_ETH_KEY``."""
     key_str = _require_env("BITBOOTPY_ETH_KEY")
