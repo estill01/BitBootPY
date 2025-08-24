@@ -21,6 +21,7 @@ from bitcoin.rpc import RawProxy
 
 from ..wallets import get_bitcoin_key, get_bitcoin_rpc_url
 from ..network_names import NetworkName
+from ..dht_network import KnownHost
 from .base import BaseDHTBackend
 from . import register_backend_with_network
 
@@ -121,5 +122,15 @@ class BitcoinBackend(BaseDHTBackend):
 
 
 # Register backend and associated network
-register_backend_with_network(NetworkName.BITCOIN, BitcoinBackend, network_name=NetworkName.BITCOIN)
+bootstrap_hosts = [
+    KnownHost("seed.bitcoin.sipa.be", 8333),
+    KnownHost("dnsseed.bluematt.me", 8333),
+    KnownHost("seed.bitcoinstats.com", 8333),
+    KnownHost("seed.bitcoin.jonasschnelli.ch", 8333),
+]
+register_backend_with_network(
+    NetworkName.BITCOIN,
+    BitcoinBackend,
+    bootstrap_hosts=bootstrap_hosts,
+)
 
