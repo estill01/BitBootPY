@@ -18,6 +18,9 @@ def register_backend(name: str, factory: Callable[[], BaseDHTBackend]) -> None:
 from .kademlia import KademliaBackend
 register_backend("kademlia", KademliaBackend)
 
+from .arweave import ArweaveBackend
+register_backend("arweave", ArweaveBackend)
+
 # Optional example backends
 try:  # pragma: no cover - illustrative only
     from .ethereum_backend import EthereumBackend
