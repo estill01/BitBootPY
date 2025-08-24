@@ -25,12 +25,34 @@ class KnownHost:
 
 
 @dataclass
+class DHTBackendConfig:
+    """Configuration for a single DHT backend bound to a network name."""
+
+    backend: str
+    bootstrap_hosts: List[KnownHost] = field(default_factory=list)
+
+
+@dataclass
 class DHTNetwork:
-    """Description of a DHT network and how to bootstrap it."""
+    """Logical DHT network that can use multiple backend implementations.
+
+    A single named network may use multiple backends concurrently. Bootstrap
+    hosts may be specified per-backend, and convenience helpers provide the
+    union of all hosts when needed.
+    """
 
     name: str
-    backend: str = "kademlia"
-    bootstrap_hosts: List[KnownHost] = field(default_factory=list)
+    backends: List[DHTBackendConfig] = field(
+        default_factory=lambda: [DHTBackendConfig("kademlia", [])]
+    )
+
+    def all_bootstrap_hosts(self) -> List[KnownHost]:
+        hosts: List[KnownHost] = []
+        for b in self.backends:
+            for h in b.bootstrap_hosts:
+                if h not in hosts:
+                    hosts.append(h)
+        return hosts
 
 
 class DHTNetworkRegistry:
@@ -63,7 +85,10 @@ class DHTNetworkRegistry:
     def add_known_host(self, name: Union[str, NetworkName], host: KnownHost) -> DHTNetwork:
         key = name.value if isinstance(name, NetworkName) else name
         network = self._networks.setdefault(key, DHTNetwork(key))
-        network.bootstrap_hosts.append(host)
+        # Add to all backend configs
+        for cfg in network.backends:
+            if host not in cfg.bootstrap_hosts:
+                cfg.bootstrap_hosts.append(host)
         return network
 
     def remove_known_host(self, name: Union[str, NetworkName], host: KnownHost) -> None:
@@ -71,10 +96,11 @@ class DHTNetworkRegistry:
         network = self._networks.get(key)
         if not network:
             return
-        try:
-            network.bootstrap_hosts.remove(host)
-        except ValueError:
-            pass
+        for cfg in network.backends:
+            try:
+                cfg.bootstrap_hosts.remove(host)
+            except ValueError:
+                pass
 
 
 # Global registry instance used throughout the project
@@ -93,7 +119,9 @@ from . import backends as _backends  # noqa: F401
 
 def add_network(name: Union[str, NetworkName], hosts: Optional[List[KnownHost]] = None) -> DHTNetwork:
     key = name.value if isinstance(name, NetworkName) else name
-    network = DHTNetwork(key, bootstrap_hosts=hosts or [])
+    network = DHTNetwork(
+        key, backends=[DHTBackendConfig("kademlia", hosts or [])]
+    )
     return DHT_NETWORK_REGISTRY.add(network)
 
 
@@ -117,4 +145,3 @@ class DHTConfig:
         default_factory=lambda: DHT_NETWORK_REGISTRY.get(NetworkName.BIT_TORRENT)
     )
     listen: KnownHost = KnownHost("0.0.0.0", 5678)
-

@@ -35,15 +35,29 @@ class DHTManager:
     ):
         self._config = config or DHTConfig()
 
-        backend_factory = BACKEND_REGISTRY.get(self._config.network.backend)
-        if backend_factory is None:
-            raise ValueError(
-                f"Unsupported DHT backend: {self._config.network.backend}"
-            )
-        self._backend: BaseDHTBackend = backend_factory()
+        # Instantiate all configured backends for this network
+        self._backends: Dict[str, BaseDHTBackend] = {}
+        for cfg in self._config.network.backends:
+            factory = BACKEND_REGISTRY.get(cfg.backend)
+            if factory is None:
+                raise ValueError(f"Unsupported DHT backend: {cfg.backend}")
+            self._backends[cfg.backend] = factory()
+
+        # Default bootstrap nodes is the union across backends unless provided
         self._bootstrap_nodes: List[KnownHost] = (
-            bootstrap_nodes or self._config.network.bootstrap_hosts
+            bootstrap_nodes or self._config.network.all_bootstrap_hosts()
         )
+
+    # Back-compat shim used by tests to override the single backend
+    @property
+    def _backend(self) -> BaseDHTBackend:
+        # Return the first backend instance
+        return next(iter(self._backends.values()))
+
+    @_backend.setter
+    def _backend(self, value: BaseDHTBackend) -> None:
+        # Replace all with a single entry for testing
+        self._backends = {"__test__": value}
 
 
     @classmethod
@@ -61,46 +75,92 @@ class DHTManager:
     async def _bootstrap_dht(self) -> None:
         """Start the local DHT node and bootstrap with known peers."""
 
-        await self._backend.listen(self._config.listen.port)
-
-        # Connect to known nodes
-        if self._bootstrap_nodes:
-            await self._backend.bootstrap(
-                [node.as_tuple() for node in self._bootstrap_nodes]
-            )
+        for backend in self._backends.values():
+            await backend.listen(self._config.listen.port)
+            # Connect to known nodes
+            if self._bootstrap_nodes:
+                await backend.bootstrap([node.as_tuple() for node in self._bootstrap_nodes])
 
     def get_routing_table(self) -> List[KBucket]:
-        server = getattr(self._backend, "server", None)
-        if server and getattr(server, "protocol", None):
-            return server.protocol.router.buckets
+        # Prefer a server that exposes a routing table (e.g., kademlia)
+        for backend in self._backends.values():
+            server = getattr(backend, "server", None)
+            if server and getattr(server, "protocol", None):
+                return server.protocol.router.buckets
         return []
 
     def is_server_started(self) -> bool:
-        server = getattr(self._backend, "server", None)
-        return bool(getattr(server, "transport", None))
+        for backend in self._backends.values():
+            server = getattr(backend, "server", None)
+            if bool(getattr(server, "transport", None)):
+                return True
+        return False
 
     async def wait_for_server_start(self):
         while not self.is_server_started():
             await asyncio.sleep(0.1)
 
     def stop(self):
-        self._backend.stop()
+        for backend in self._backends.values():
+            backend.stop()
 
     # ------------------------------------------------------------------
     # Convenience wrappers around backend operations
     # ------------------------------------------------------------------
     async def get(self, key: bytes):
-        return await self._backend.get(key)
+        # Query all backends concurrently and merge results
+        async def _one(b: BaseDHTBackend):
+            try:
+                return await b.get(key)
+            except Exception:
+                return None
+
+        results = await asyncio.gather(*[_one(b) for b in self._backends.values()])
+
+        # Merge policy: if any list/tuple/set returned, combine unique entries
+        merged_seq = []
+        have_seq = False
+        for r in results:
+            if isinstance(r, (list, tuple, set)):
+                have_seq = True
+                for item in r:
+                    if item not in merged_seq:
+                        merged_seq.append(item)
+        if have_seq:
+            return merged_seq
+        # Otherwise return first non-None scalar
+        for r in results:
+            if r is not None:
+                return r
+        return None
 
     async def set(self, key: bytes, value):
-        return await self._backend.set(key, value)
+        # Broadcast set to all backends; consider success if any succeed
+        async def _one(b: BaseDHTBackend):
+            try:
+                return await b.set(key, value)
+            except Exception:
+                return False
+
+        results = await asyncio.gather(*[_one(b) for b in self._backends.values()])
+        return any(results)
 
     def get_server(self):
         """Return the backend instance for direct access if needed."""
         return self._backend
 
     def get_listening_host(self) -> KnownHost:
-        host, port = self._backend.get_listening_host()
+        # Prefer a backend that can return an actual bound socket (e.g., kademlia)
+        for backend in self._backends.values():
+            try:
+                host, port = backend.get_listening_host()
+                if host and port:
+                    return KnownHost(host, port)
+            except Exception:
+                continue
+        # Fall back to first backend's report
+        backend = next(iter(self._backends.values()))
+        host, port = backend.get_listening_host()
         return KnownHost(host, port)
 
     async def switch_network(
@@ -119,11 +179,14 @@ class DHTManager:
             net = network
 
         self._config = DHTConfig(network=net, listen=self._config.listen)
-        backend_factory = BACKEND_REGISTRY.get(net.backend)
-        if backend_factory is None:
-            raise ValueError(f"Unsupported DHT backend: {net.backend}")
-        self._backend = backend_factory()
-        self._bootstrap_nodes = bootstrap_nodes or net.bootstrap_hosts
+        # Rebuild backend instances from network config
+        self._backends = {}
+        for cfg in net.backends:
+            factory = BACKEND_REGISTRY.get(cfg.backend)
+            if factory is None:
+                raise ValueError(f"Unsupported DHT backend: {cfg.backend}")
+            self._backends[cfg.backend] = factory()
+        self._bootstrap_nodes = bootstrap_nodes or net.all_bootstrap_hosts()
         await self._bootstrap_dht()
 
 
@@ -143,9 +206,7 @@ class MultiDHTManager:
         else:
             net = network
 
-        manager = DHTManager(
-            bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net)
-        )
+        manager = DHTManager(bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net))
         self._managers[net.name] = manager
         return manager
 
@@ -159,9 +220,7 @@ class MultiDHTManager:
         else:
             net = network
 
-        manager = await DHTManager.create(
-            bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net)
-        )
+        manager = await DHTManager.create(bootstrap_nodes=bootstrap_nodes, config=DHTConfig(network=net))
         self._managers[net.name] = manager
         return manager
 
@@ -204,7 +263,7 @@ class MultiDHTManager:
 
         # Create a new manager if one didn't exist
         manager = await DHTManager.create(
-            bootstrap_nodes=bootstrap_nodes or net.bootstrap_hosts,
+            bootstrap_nodes=bootstrap_nodes or net.all_bootstrap_hosts(),
             config=DHTConfig(network=net),
         )
         self._managers[net.name] = manager

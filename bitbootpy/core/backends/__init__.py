@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Union
 
-from ..dht_network import DHTNetwork, DHT_NETWORK_REGISTRY, KnownHost
+from ..dht_network import (
+    DHTNetwork,
+    DHTBackendConfig,
+    DHT_NETWORK_REGISTRY,
+    KnownHost,
+)
 from ..network_names import NetworkName
 from .base import BaseDHTBackend
 
@@ -52,13 +57,21 @@ def register_backend_with_network(
     )
     BACKEND_REGISTRY[backend_key] = backend_factory
 
-    DHT_NETWORK_REGISTRY.add(
-        DHTNetwork(
-            network,
-            backend=backend_key,
-            bootstrap_hosts=bootstrap_hosts or [],
-        )
-    )
+    # Append or create network with the given backend mapping
+    existing = DHT_NETWORK_REGISTRY.get(network)
+    cfg = DHTBackendConfig(backend=backend_key, bootstrap_hosts=bootstrap_hosts or [])
+    if existing is None:
+        DHT_NETWORK_REGISTRY.add(DHTNetwork(name=network, backends=[cfg]))
+    else:
+        # Replace existing config for this backend if present; else append
+        replaced = False
+        for i, b in enumerate(existing.backends):
+            if b.backend == backend_key:
+                existing.backends[i] = cfg
+                replaced = True
+                break
+        if not replaced:
+            existing.backends.append(cfg)
 
 
 def set_backend_for_network(
@@ -72,13 +85,15 @@ def set_backend_for_network(
     key = network_name.value if isinstance(network_name, NetworkName) else str(network_name)
     network = DHT_NETWORK_REGISTRY.get(key)
     if not network:
-        # Create the network if it doesn't exist yet
-        DHT_NETWORK_REGISTRY.add(DHTNetwork(key, backend=backend_key))
+        # Create the network if it doesn't exist yet with empty hosts
+        DHT_NETWORK_REGISTRY.add(
+            DHTNetwork(name=key, backends=[DHTBackendConfig(backend_key, [])])
+        )
         return
-    # Replace the registry entry with an updated backend
-    DHT_NETWORK_REGISTRY.add(
-        DHTNetwork(name=network.name, backend=backend_key, bootstrap_hosts=network.bootstrap_hosts)
-    )
+    # Preserve union of hosts and set a single backend
+    hosts = network.all_bootstrap_hosts()
+    new_net = DHTNetwork(name=network.name, backends=[DHTBackendConfig(backend_key, hosts)])
+    DHT_NETWORK_REGISTRY.add(new_net)
 
 
 # ---------------------------------------------------------------------------

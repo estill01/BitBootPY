@@ -36,7 +36,8 @@ class BitBootConfig:
         dht: Optional[DHTConfig] = None,
     ):
         self.dht = dht or DHTConfig()
-        self.bootstrap_nodes = bootstrap_nodes or self.dht.network.bootstrap_hosts
+        # Default bootstrap nodes: union across configured backends
+        self.bootstrap_nodes = bootstrap_nodes or self.dht.network.all_bootstrap_hosts()
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -105,7 +106,7 @@ class BitBoot:
         else:
             net = network
         self._config.dht = DHTConfig(network=net, listen=self._config.dht.listen)
-        self._config.bootstrap_nodes = bootstrap_nodes or net.bootstrap_hosts
+        self._config.bootstrap_nodes = bootstrap_nodes or net.all_bootstrap_hosts()
 
     # -----------------------
     # Util
